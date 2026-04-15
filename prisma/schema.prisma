@@ -1,0 +1,250 @@
+// =============================================================
+// Schéma Prisma — OKKAZ Backend
+// Base de données : Supabase PostgreSQL
+// =============================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ----- UTILISATEURS -----
+
+enum Role {
+  USER
+  OWNER
+  OWNER_PREMIUM
+  ADMIN
+}
+
+model User {
+  id            String   @id @default(uuid())
+  email         String   @unique
+  phone         String
+  passwordHash  String
+  firstName     String
+  lastName      String
+  role          Role     @default(USER)
+  bio           String?
+  avatarUrl     String?
+  city          String?
+  idDocumentUrl String?  // KYC — pièce d'identité
+  isVerified    Boolean  @default(false)
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  listings      Listing[]
+  reviews       Review[]       @relation("ReviewAuthor")
+  receivedReviews Review[]     @relation("ReviewTarget")
+  payments      Payment[]
+  favorites     Favorite[]
+  reports       Report[]       @relation("ReportAuthor")
+  receivedReports Report[]     @relation("ReportTarget")
+  contactAccesses ContactAccess[]
+
+  @@index([email])
+  @@index([role])
+  @@map("users")
+}
+
+// ----- CATÉGORIES -----
+
+model Category {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  slug        String   @unique
+  description String?
+  iconUrl     String?
+  parentId    String?
+  parent      Category?  @relation("CategoryTree", fields: [parentId], references: [id])
+  children    Category[] @relation("CategoryTree")
+  createdAt   DateTime @default(now())
+
+  listings    Listing[]
+
+  @@index([slug])
+  @@map("categories")
+}
+
+// ----- ANNONCES -----
+
+enum ListingStatus {
+  PENDING
+  ACTIVE
+  REJECTED
+  EXPIRED
+  RENTED
+}
+
+model Listing {
+  id          String        @id @default(uuid())
+  title       String
+  description String
+  price       Float
+  city        String
+  address     String?
+  conditions  String?
+  photos      String[]      // URLs des photos
+  status      ListingStatus @default(PENDING)
+  rejectionReason String?
+  viewCount   Int           @default(0)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  // Relations
+  ownerId     String
+  owner       User          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  categoryId  String
+  category    Category      @relation(fields: [categoryId], references: [id])
+
+  reviews     Review[]
+  favorites   Favorite[]
+  contactAccesses ContactAccess[]
+
+  @@index([status])
+  @@index([categoryId])
+  @@index([ownerId])
+  @@index([city])
+  @@index([price])
+  @@index([createdAt])
+  @@map("listings")
+}
+
+// ----- ACCÈS AUX CONTACTS (monétisation MVP) -----
+
+model ContactAccess {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  listingId   String
+  listing     Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  amount      Float    // Montant payé pour l'accès
+  expiresAt   DateTime // Durée d'accès limitée
+  createdAt   DateTime @default(now())
+
+  payment     Payment?
+
+  @@unique([userId, listingId])
+  @@map("contact_accesses")
+}
+
+// ----- PAIEMENTS -----
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+enum PaymentMethod {
+  MOBILE_MONEY_MTN
+  MOBILE_MONEY_MOOV
+  MOBILE_MONEY_CELTIS
+  CARD
+}
+
+model Payment {
+  id              String        @id @default(uuid())
+  amount          Float
+  currency        String        @default("XOF")
+  status          PaymentStatus @default(PENDING)
+  method          PaymentMethod
+  transactionRef  String?       @unique // Référence du fournisseur de paiement
+  description     String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  // Relations
+  userId          String
+  user            User          @relation(fields: [userId], references: [id])
+  contactAccessId String?       @unique
+  contactAccess   ContactAccess? @relation(fields: [contactAccessId], references: [id])
+
+  @@index([userId])
+  @@index([status])
+  @@map("payments")
+}
+
+// ----- AVIS & NOTATIONS -----
+
+model Review {
+  id        String   @id @default(uuid())
+  rating    Int      // 1 à 5
+  comment   String?
+  createdAt DateTime @default(now())
+
+  // Auteur de l'avis
+  authorId  String
+  author    User     @relation("ReviewAuthor", fields: [authorId], references: [id])
+
+  // Cible de l'avis (propriétaire)
+  targetId  String
+  target    User     @relation("ReviewTarget", fields: [targetId], references: [id])
+
+  // Annonce concernée
+  listingId String
+  listing   Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@unique([authorId, listingId])
+  @@map("reviews")
+}
+
+// ----- FAVORIS -----
+
+model Favorite {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  listingId String
+  listing   Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, listingId])
+  @@map("favorites")
+}
+
+// ----- SIGNALEMENTS -----
+
+enum ReportStatus {
+  PENDING
+  REVIEWED
+  RESOLVED
+  DISMISSED
+}
+
+model Report {
+  id        String       @id @default(uuid())
+  reason    String
+  details   String?
+  status    ReportStatus @default(PENDING)
+  createdAt DateTime     @default(now())
+
+  // Auteur du signalement
+  authorId  String
+  author    User         @relation("ReportAuthor", fields: [authorId], references: [id])
+
+  // Utilisateur signalé
+  targetId  String
+  target    User         @relation("ReportTarget", fields: [targetId], references: [id])
+
+  @@map("reports")
+}
+
+// ----- PARAMÈTRES PLATEFORME -----
+
+model PlatformSetting {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  value     String
+  updatedAt DateTime @updatedAt
+
+  @@map("platform_settings")
+}
