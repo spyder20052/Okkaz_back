@@ -1,42 +1,49 @@
 /**
  * @module server
- * @description Point d'entrée de l'application.
- *   Démarre le serveur HTTP et connecte Prisma.
+ * @description Point d'entrée du serveur. Lance l'application Express et
+ *   gère l'arrêt propre (SIGTERM/SIGINT) avec fermeture de la connexion
+ *   Prisma (§5.1 — observabilité).
  *
- * @dependencies app, prisma, env, logger
- * @author Spynel KOUTON
+ * @author KOUTON Spynel
  */
 
-import app from './app';
-import { env, prisma } from './config';
-import { logger } from './utils/logger';
+import { createApp } from "./app";
+import { env } from "./config/env";
+import { prisma } from "./config/prisma";
+import { logger } from "./config/logger";
 
-async function bootstrap() {
-  try {
-    // Vérification connexion base de données
-    await prisma.$connect();
-    logger.info('Connexion à la base de données établie (Supabase PostgreSQL).');
+const app = createApp();
 
-    app.listen(env.PORT, () => {
-      logger.info(`Serveur OKKAZ démarré sur le port ${env.PORT} [${env.NODE_ENV}]`);
-    });
-  } catch (error) {
-    logger.error('Échec du démarrage du serveur.', error);
+const server = app.listen(env.PORT, () => {
+  logger.info(
+    { port: env.PORT, env: env.NODE_ENV, prefix: env.API_PREFIX },
+    `🚀 OKKAZ API running on http://localhost:${env.PORT}`,
+  );
+});
+
+// ── Arrêt propre ─────────────────────────────────────────────────────────────
+async function shutdown(signal: string): Promise<void> {
+  logger.info({ signal }, "Shutting down gracefully…");
+  server.close(async () => {
+    await prisma.$disconnect();
+    logger.info("✓ Database disconnected. Bye.");
+    process.exit(0);
+  });
+  // Force exit après 10s si des connexions restent ouvertes.
+  setTimeout(() => {
+    logger.error("Forced shutdown after 10s timeout.");
     process.exit(1);
-  }
+  }, 10_000);
 }
 
-// Arrêt propre
-process.on('SIGTERM', async () => {
-  logger.info('Signal SIGTERM reçu — arrêt en cours...');
-  await prisma.$disconnect();
-  process.exit(0);
+process.on("SIGTERM", () => void shutdown("SIGTERM"));
+process.on("SIGINT", () => void shutdown("SIGINT"));
+
+process.on("unhandledRejection", (reason: unknown) => {
+  logger.error({ reason }, "Unhandled promise rejection");
 });
 
-process.on('SIGINT', async () => {
-  logger.info('Signal SIGINT reçu — arrêt en cours...');
-  await prisma.$disconnect();
-  process.exit(0);
+process.on("uncaughtException", (err: Error) => {
+  logger.fatal({ err }, "Uncaught exception — shutting down");
+  void shutdown("uncaughtException");
 });
-
-bootstrap();

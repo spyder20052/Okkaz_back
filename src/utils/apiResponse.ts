@@ -1,49 +1,74 @@
 /**
- * @module apiResponse
- * @description Helpers pour formater les réponses API de manière cohérente.
+ * @module utils/apiResponse
+ * @description Helpers de réponse HTTP conformes au §7.2 du cahier des
+ *   charges. Toutes les réponses suivent la structure :
+ *     { success: true, data, message?, meta? }   // succès
+ *     { success: false, error: { code, message, details? } }   // erreur
  *
- * @author Spynel KOUTON
+ * @author KOUTON Spynel
  */
 
-import { Response } from 'express';
-import type { ApiSuccessResponse, ApiErrorResponse } from '../types';
+import type { Response } from "express";
 
-/**
- * Envoie une réponse de succès formatée.
- *
- * @param res - Objet Response Express
- * @param data - Données à retourner
- * @param statusCode - Code HTTP (défaut : 200)
- * @param meta - Métadonnées optionnelles (pagination)
- */
+export interface PaginationMeta {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+}
+
 export function sendSuccess<T>(
   res: Response,
   data: T,
-  statusCode = 200,
-  meta?: ApiSuccessResponse['meta']
-): void {
-  const response: ApiSuccessResponse<T> = { status: 'success', data };
-  if (meta) response.meta = meta;
-  res.status(statusCode).json(response);
+  message?: string,
+  status = 200,
+): Response {
+  return res.status(status).json({
+    success: true,
+    data,
+    ...(message ? { message } : {}),
+  });
 }
 
-/**
- * Envoie une réponse d'erreur formatée.
- *
- * @param res - Objet Response Express
- * @param code - Code d'erreur applicatif (ex: RESOURCE_NOT_FOUND)
- * @param message - Message lisible
- * @param statusCode - Code HTTP (défaut : 400)
- * @param details - Détails optionnels (erreurs de validation)
- */
+export function sendCreated<T>(
+  res: Response,
+  data: T,
+  message?: string,
+): Response {
+  return sendSuccess(res, data, message, 201);
+}
+
+export function sendPaginated<T>(
+  res: Response,
+  data: T[],
+  meta: PaginationMeta,
+  message?: string,
+): Response {
+  return res.status(200).json({
+    success: true,
+    data,
+    meta,
+    ...(message ? { message } : {}),
+  });
+}
+
+export function sendNoContent(res: Response): Response {
+  return res.status(204).send();
+}
+
 export function sendError(
   res: Response,
+  status: number,
   code: string,
   message: string,
-  statusCode = 400,
-  details?: unknown
-): void {
-  const response: ApiErrorResponse = { status: 'error', code, message };
-  if (details) response.details = details;
-  res.status(statusCode).json(response);
+  details?: unknown,
+): Response {
+  return res.status(status).json({
+    success: false,
+    error: {
+      code,
+      message,
+      ...(details ? { details } : {}),
+    },
+  });
 }

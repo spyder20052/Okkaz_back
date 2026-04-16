@@ -1,14 +1,25 @@
 /**
- * @module prisma
- * @description Instance singleton du client Prisma.
- *   Réutilisée dans tous les services/repositories.
+ * @module config/prisma
+ * @description Instance Prisma unique partagée par tous les modules.
+ *   Évite la multiplication des connexions en développement (hot-reload).
  *
- * @dependencies @prisma/client
- * @author Spynel KOUTON
+ * @author KOUTON Spynel
  */
 
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from "@prisma/client";
+import { isProduction } from "./env";
 
-export const prisma = new PrismaClient({
-  log: process.env.NODE_ENV === 'development' ? ['query', 'warn', 'error'] : ['error'],
-});
+declare global {
+  // eslint-disable-next-line no-var
+  var __prisma: PrismaClient | undefined;
+}
+
+export const prisma: PrismaClient =
+  global.__prisma ??
+  new PrismaClient({
+    log: isProduction ? ["error"] : ["error", "warn"],
+  });
+
+if (!isProduction) {
+  global.__prisma = prisma;
+}
