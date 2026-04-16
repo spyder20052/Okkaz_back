@@ -9,8 +9,8 @@ info:
       `{ success: true, data, message?, meta? }` (succès)
       `{ success: false, error: { code, message, details? } }` (erreur)
   contact:
-    name: Stage SCORE
-    email: admin@okkaz.bj
+    name: KOUTON Spynel
+    email: kspynel@gmail.com
 
 servers:
   - url: http://localhost:3000/api/v1
