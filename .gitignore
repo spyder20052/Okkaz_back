@@ -44,3 +44,4 @@ AGENT.md
 
 # Claude Code local artifacts
 .claude/
+.env.test
