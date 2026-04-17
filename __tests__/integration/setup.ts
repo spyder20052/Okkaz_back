@@ -6,3 +6,16 @@ jest.mock('nodemailer', () => ({
     verify: jest.fn().mockResolvedValue(true),
   }),
 }));
+
+jest.mock('../../src/services/storage.service', () => ({
+  uploadAsset: jest.fn().mockResolvedValue({
+    url: 'https://test-storage.com/asset.jpg',
+    key: 'test-key',
+  }),
+  storage: {
+    upload: jest.fn().mockResolvedValue({
+      url: 'https://test-storage.com/asset.jpg',
+      key: 'test-key',
+    }),
+  },
+}));
