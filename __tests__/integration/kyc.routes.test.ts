@@ -132,5 +132,13 @@ describe('KYC Routes (Integration)', () => {
 
       expect(res.status).toBe(409);
     });
+
+    it('doit echouer avec 404 si le document kyc n existe pas', async () => {
+      const res = await request(app)
+        .patch(`/api/v1/kyc/admin/00000000-0000-0000-0000-000000000000/approve`)
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(res.status).toBe(404);
+    });
   });
 });

@@ -111,7 +111,7 @@ describe('Payments Routes (Integration)', () => {
         .post('/api/v1/payments/webhook')
         .set('x-kkiapay-signature', signature)
         .set('Content-Type', 'application/json')
-        .send(payload);
+        .send(rawBody);
 
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);

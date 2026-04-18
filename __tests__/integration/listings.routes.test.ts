@@ -103,6 +103,42 @@ describe('Listings Routes (Integration)', () => {
         .send({ title: 'Short' });
       expect(res.status).toBe(422);
     });
+
+    it('doit echouer avec 400 si la categorie est invalide', async () => {
+      const res = await request(app)
+        .post('/api/v1/listings')
+        .set('Authorization', `Bearer ${sellerToken}`)
+        .send({
+          title: `Voiture additionnelle`,
+          description: 'Magnifique voiture.',
+          categoryId: '00000000-0000-0000-0000-000000000000',
+          rentalPrice: 50000,
+          rentalPeriod: 'DAY',
+          condition: 'GOOD',
+          locationCity: 'Cotonou',
+          contactPhone: '229988776655',
+        });
+      expect(res.status).toBe(400); // INVALID_CATEGORY
+    });
+
+    it('doit echouer avec 403 si un SELLER tente de creer une LOA', async () => {
+      const res = await request(app)
+        .post('/api/v1/listings')
+        .set('Authorization', `Bearer ${sellerToken}`)
+        .send({
+          title: `Voiture en LOA`,
+          description: 'Magnifique voiture.',
+          categoryId,
+          rentalPrice: 50000,
+          rentalPeriod: 'DAY',
+          condition: 'GOOD',
+          locationCity: 'Cotonou',
+          contactPhone: '229988776655',
+          isLoa: true,
+          loaDurationMonths: 12
+        });
+      expect(res.status).toBe(403); // LOA_PRO_ONLY
+    });
   });
 
   describe('GET /api/v1/listings', () => {
@@ -142,6 +178,35 @@ describe('Listings Routes (Integration)', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.data.listing.title).toBe('Toyota Corolla 2022 Modifiée');
+    });
+
+    it('doit renvoyer 404 pour une annonce inexistante', async () => {
+      const res = await request(app)
+        .patch('/api/v1/listings/00000000-0000-0000-0000-000000000000')
+        .set('Authorization', `Bearer ${sellerToken}`)
+        .send({ title: 'Titre' });
+      expect(res.status).toBe(404);
+    });
+
+    it('doit renvoyer 403 si l on modifie une annonce ne nous appartenant pas', async () => {
+      // Admin should not be able to update seller listing via this endpoint (as it is protected by isOwner)
+      // or we can create another seller token. Admin bypasses isOwner? Wait, isOwner checks the role if it's admin, admin can do it?
+      // Actually let's create a second seller and test.
+      const hackerRes = await request(app).post('/api/v1/auth/register').send({
+        email: 'hacker@example.com',
+        password: 'Password123!',
+        firstName: 'Hacker',
+        lastName: 'Boy',
+        phone: '22990000000',
+        role: 'SELLER'
+      });
+      const hackerToken = hackerRes.body.data.tokens.accessToken;
+      
+      const res = await request(app)
+        .patch(`/api/v1/listings/${listingId}`)
+        .set('Authorization', `Bearer ${hackerToken}`)
+        .send({ title: 'HackTitle' });
+      expect(res.status).toBe(403);
     });
   });
 
