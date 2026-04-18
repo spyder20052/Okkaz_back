@@ -1,38 +1,66 @@
 /**
  * @module middlewares/rateLimit
- * @description Rate limiting global et spécifique aux routes d'auth (§5.1).
+ * @description Middleware de rate limiting basé sur `express-rate-limit`.
+ *
+ *   Deux configurations pré-construites :
+ *   - `globalLimiter`  : limiteur global (200 req/15 min par IP).
+ *   - `authLimiter`    : limiteur strict pour les routes d'authentification
+ *     (10 req/15 min par IP) afin de prévenir le brute-force.
  *
  * @author KOUTON Spynel
  */
 
 import rateLimit from "express-rate-limit";
-import { env } from "../config/env";
 
-export const globalRateLimiter = rateLimit({
-  windowMs: env.RATE_LIMIT_WINDOW_MS,
-  max: env.RATE_LIMIT_MAX,
+/**
+ * Rate limiter global appliqué à toutes les routes de l'API.
+ *
+ * Configuration :
+ * - **Fenêtre** : 15 minutes.
+ * - **Maximum** : 200 requêtes par IP par fenêtre.
+ * - **standardHeaders** : envoie les headers `RateLimit-*` (RFC 6585).
+ * - **legacyHeaders** : désactive les headers `X-RateLimit-*` (obsolètes).
+ *
+ * @example
+ * ```ts
+ * app.use('/api', globalLimiter);
+ * ```
+ */
+export const globalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 200,
   standardHeaders: true,
   legacyHeaders: false,
-  skip: () => process.env.NODE_ENV === "test",
   message: {
     success: false,
-    error: {
-      code: "RATE_LIMIT_EXCEEDED",
-      message: "Trop de requêtes, réessayez plus tard.",
-    },
+    error: { code: "RATE_LIMIT", message: "Trop de requêtes." },
   },
 });
 
-export const authRateLimiter = rateLimit({
-  windowMs: env.RATE_LIMIT_WINDOW_MS,
-  max: env.AUTH_RATE_LIMIT_MAX,
+/**
+ * Rate limiter strict dédié aux routes sensibles d'authentification
+ * (`/login`, `/register`, `/forgot-password`, `/reset-password`).
+ *
+ * Configuration :
+ * - **Fenêtre** : 15 minutes.
+ * - **Maximum** : 10 requêtes par IP par fenêtre.
+ *
+ * Protection contre le brute-force de mots de passe et le credential stuffing.
+ *
+ * @example
+ * ```ts
+ * router.post('/login', authLimiter, asyncHandler(controller.login));
+ * ```
+ */
+export const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
   standardHeaders: true,
   legacyHeaders: false,
-  skip: () => process.env.NODE_ENV === "test",
   message: {
     success: false,
     error: {
-      code: "AUTH_RATE_LIMIT_EXCEEDED",
+      code: "AUTH_RATE_LIMIT",
       message: "Trop de tentatives, réessayez plus tard.",
     },
   },

@@ -5,7 +5,9 @@
 
 import { z } from 'zod';
 
+/** Regex pour numéros de téléphone : 8 à 15 chiffres, préfixe + optionnel. */
 const phoneRegex = /^\+?\d{8,15}$/;
+/** Politique de mot de passe : 8-128 caractères, au moins 1 majuscule, 1 minuscule, 1 chiffre. */
 const passwordSchema = z
   .string()
   .min(8, 'Mot de passe trop court (8 caractères minimum).')
@@ -14,6 +16,16 @@ const passwordSchema = z
   .regex(/[a-z]/, 'Doit contenir une minuscule.')
   .regex(/\d/, 'Doit contenir un chiffre.');
 
+/**
+ * Schéma d'inscription. Body de `POST /auth/register`.
+ *
+ * @property firstName - Prénom (2-100 caractères).
+ * @property lastName  - Nom (2-100 caractères).
+ * @property email     - Adresse email (normalisée en lowercase).
+ * @property phone     - Numéro de téléphone.
+ * @property password  - Mot de passe (min 8, politique stricte).
+ * @property role      - Rôle : `BUYER` (défaut) ou `SELLER`.
+ */
 export const registerSchema = z.object({
   firstName: z.string().min(2).max(100),
   lastName: z.string().min(2).max(100),
@@ -23,6 +35,10 @@ export const registerSchema = z.object({
   role: z.enum(['BUYER', 'SELLER']).default('BUYER'),
 });
 
+/**
+ * Schéma de connexion. Body de `POST /auth/login`.
+ * Au moins `email` ou `phone` est requis (`.refine()`).
+ */
 export const loginSchema = z
   .object({
     email: z.string().email().toLowerCase().optional(),
@@ -34,22 +50,27 @@ export const loginSchema = z
     path: ['email'],
   });
 
+/** Schéma du body pour `POST /auth/refresh`. */
 export const refreshTokenSchema = z.object({
   refreshToken: z.string().min(1),
 });
 
+/** Schéma du body pour `POST /auth/forgot-password`. */
 export const forgotPasswordSchema = z.object({
   email: z.string().email().toLowerCase(),
 });
 
+/** Schéma du body pour `POST /auth/reset-password/:token`. */
 export const resetPasswordSchema = z.object({
   newPassword: passwordSchema,
 });
 
+/** Param de route `:token` pour `GET /auth/verify-email/:token`. */
 export const verifyEmailParamsSchema = z.object({
   token: z.string().min(16),
 });
 
+/** Param de route `:token` pour `POST /auth/reset-password/:token`. */
 export const resetPasswordParamsSchema = z.object({
   token: z.string().min(16),
 });

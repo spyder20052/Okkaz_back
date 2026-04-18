@@ -32,8 +32,9 @@ import swaggerUi from 'swagger-ui-express';
 
 import { env } from './config/env';
 import { logger } from './config/logger';
-import { globalRateLimiter } from './middlewares/rateLimit';
-import { notFoundHandler, errorHandler } from './middlewares/errorHandler';
+import { globalLimiter } from './middlewares/rateLimit';
+import { errorHandler } from './middlewares/errorHandler';
+import { AppError } from './utils/AppError';
 
 // Routers
 import authRouter from './modules/auth/auth.routes';
@@ -117,7 +118,7 @@ export function createApp(): Application {
   );
 
   // ── Rate limiting global ─────────────────────────────────────────────────
-  app.use(globalRateLimiter);
+  app.use(globalLimiter);
 
   // ── Uploads locaux (dev) ─────────────────────────────────────────────────
   app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));
@@ -223,7 +224,9 @@ export function createApp(): Application {
   app.use(`${prefix}/admin`,         adminRouter);
 
   // ── Handlers finaux ───────────────────────────────────────────────────────
-  app.use(notFoundHandler);
+  app.use((_req: Request, _res: Response, next: NextFunction) => {
+    next(AppError.notFound('ROUTE_NOT_FOUND', 'Route introuvable.'));
+  });
   // L'errorHandler DOIT être déclaré en dernier (4 paramètres obligatoires).
   app.use((err: unknown, req: Request, res: Response, next: NextFunction) =>
     errorHandler(err, req, res, next),

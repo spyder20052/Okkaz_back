@@ -1,3 +1,14 @@
+/**
+ * @module modules/reports/reports.routes
+ * @description Routes des signalements (§4.8, §6.2).
+ *
+ * | Méthode | Chemin              | Rôle(s) | Description                    |
+ * |---------|---------------------|---------|--------------------------------|
+ * | POST    | /                   | Auth    | Créer un signalement           |
+ * | GET     | /admin/list         | ADMIN   | Liste paginée des signalements |
+ * | GET     | /admin/:id          | ADMIN   | Détail d'un signalement        |
+ * | PATCH   | /admin/:id/review   | ADMIN   | Traiter un signalement         |
+ */
 import { Router } from 'express';
 import * as controller from './reports.controller';
 import * as schemas from './reports.validator';

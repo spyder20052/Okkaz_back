@@ -1,3 +1,16 @@
+/**
+ * @module modules/demands/demands.routes
+ * @description Routes des demandes « Je recherche » (§4.10).
+ *
+ * | Méthode | Chemin         | Rôle(s)                    | Description                 |
+ * |---------|----------------|----------------------------|-----------------------------|
+ * | POST    | /initiate      | BUYER                      | Initie une demande + paiement |
+ * | GET     | /              | SELLER_PRO                 | Demandes pro (STD + EXPRESS)  |
+ * | GET     | /standard      | SELLER, SELLER_PRO         | Demandes STANDARD publiques   |
+ * | GET     | /me            | BUYER                      | Mes demandes                  |
+ * | GET     | /:id           | SELLER, SELLER_PRO, ADMIN  | Détail d'une demande          |
+ * | PATCH   | /:id/close     | BUYER, ADMIN               | Clôturer une demande          |
+ */
 import { Router } from 'express';
 import * as controller from './demands.controller';
 import * as schemas from './demands.validator';

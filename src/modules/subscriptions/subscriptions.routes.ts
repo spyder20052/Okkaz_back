@@ -1,3 +1,14 @@
+/**
+ * @module modules/subscriptions/subscriptions.routes
+ * @description Routes d'abonnements Premium SELLER_PRO (§4.7).
+ *
+ * | Méthode | Chemin      | Rôle(s)              | Description                     |
+ * |---------|-------------|----------------------|---------------------------------|
+ * | GET     | /plans      | Public               | Plans disponibles               |
+ * | POST    | /subscribe  | SELLER, SELLER_PRO   | Souscription                    |
+ * | GET     | /me         | SELLER, SELLER_PRO   | Mon abonnement                  |
+ * | POST    | /cancel     | SELLER, SELLER_PRO   | Désactive le renouvellement     |
+ */
 import { Router } from 'express';
 import * as controller from './subscriptions.controller';
 import * as schemas from './subscriptions.validator';

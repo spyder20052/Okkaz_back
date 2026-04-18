@@ -1,22 +1,37 @@
 /**
  * @module utils/asyncHandler
- * @description Wrapper qui propage les erreurs des handlers async vers
- *   le middleware de gestion d'erreurs d'Express. Évite les
- *   `try { ... } catch (err) { next(err); }` répétitifs.
+ * @description Wrapper pour les fonctions asynchrones des contrôleurs Express.
+ *
+ *   Express ne capture pas nativement les rejets de Promise dans les handlers
+ *   `async`. Ce wrapper appelle `next(err)` automatiquement si la Promise est
+ *   rejetée, ce qui permet au middleware `errorHandler` global de traiter
+ *   l'erreur de façon centralisée.
  *
  * @author KOUTON Spynel
  */
 
-import type { Request, Response, NextFunction, RequestHandler } from "express";
+import type { Request, Response, NextFunction } from "express";
 
-type AsyncHandler = (
-  req: Request,
-  res: Response,
-  next: NextFunction,
-) => Promise<unknown>;
-
-export function asyncHandler(handler: AsyncHandler): RequestHandler {
-  return (req, res, next) => {
-    Promise.resolve(handler(req, res, next)).catch(next);
+/**
+ * Encapsule un contrôleur asynchrone Express pour propager automatiquement
+ * les exceptions vers le middleware `errorHandler` via `next(err)`.
+ *
+ * Sans ce wrapper, une exception non capturée dans un `async handler`
+ * provoquerait un crash du process au lieu d'une réponse HTTP d'erreur.
+ *
+ * @param fn - Fonction asynchrone `(req, res, next) => Promise<any>`.
+ * @returns  Un middleware Express classique qui catch les rejets.
+ *
+ * @example
+ * ```ts
+ * // Dans le fichier de routes :
+ * router.get('/users', asyncHandler(controller.listUsers));
+ * ```
+ */
+export function asyncHandler(
+  fn: (req: Request, res: Response, next: NextFunction) => Promise<unknown>,
+) {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    fn(req, res, next).catch(next);
   };
 }

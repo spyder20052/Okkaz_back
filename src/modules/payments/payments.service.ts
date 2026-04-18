@@ -63,6 +63,17 @@ interface InitiateContactAccessResult {
   };
 }
 
+/**
+ * Initie un paiement pour accéder au contact d'une annonce.
+ *
+ * Flux : vérifie l'absence d'accès actif existant → crée un `Payment PENDING`
+ * → retourne la référence à utiliser côté SDK KKiapay.
+ *
+ * @param input - `{ userId, listingId, method, provider? }`.
+ * @returns `{ payment, checkoutHint }` — référence et clé publique KKiapay.
+ * @throws {AppError} 404 si l'annonce est introuvable/inactive.
+ * @throws {AppError} 409 si un accès actif existe déjà.
+ */
 export async function initiateContactAccess(
   input: InitiateContactAccessInput,
 ): Promise<InitiateContactAccessResult> {
@@ -137,8 +148,12 @@ export interface KkiapayWebhookBody {
 }
 
 /**
- * Traite un webhook KKiapay : met à jour le Payment et déclenche les effets
+ * Traite un webhook KKiapay : met à jour le `Payment` et déclenche les effets
  * de bord métier (ContactAccess, Subscription, DemandListing).
+ *
+ * Idempotent : ignore les paiements déjà traités.
+ *
+ * @param body - Payload du webhook KKiapay.
  */
 export async function handleWebhook(body: KkiapayWebhookBody): Promise<void> {
   const ref = body.providerRef ?? body.reference ?? body.transactionId;
@@ -198,6 +213,15 @@ export async function handleWebhook(body: KkiapayWebhookBody): Promise<void> {
   );
 }
 
+/**
+ * Crée un `ContactAccess` après paiement réussi.
+ *
+ * Re-chiffre le numéro de l'annonce dans le champ `contactPhoneRevealed`
+ * pour audit et traçabilité historique.
+ *
+ * @param paymentId - UUID du paiement.
+ * @private
+ */
 async function grantContactAccess(paymentId: string): Promise<void> {
   const payment = await prisma.payment.findUnique({ where: { id: paymentId } });
   if (!payment) return;
@@ -235,6 +259,15 @@ async function grantContactAccess(paymentId: string): Promise<void> {
   ]);
 }
 
+/**
+ * Active un abonnement SELLER_PRO après paiement réussi.
+ *
+ * Transactionnel : crée la `Subscription`, passe le rôle à `SELLER_PRO`,
+ * et marque toutes les annonces existantes comme `isFeatured`.
+ *
+ * @param paymentId - UUID du paiement.
+ * @private
+ */
 async function activateSubscription(paymentId: string): Promise<void> {
   const payment = await prisma.payment.findUnique({ where: { id: paymentId } });
   if (!payment) return;
@@ -269,6 +302,12 @@ async function activateSubscription(paymentId: string): Promise<void> {
   ]);
 }
 
+/**
+ * Active une demande (DemandListing) après paiement réussi.
+ *
+ * @param paymentId - UUID du paiement.
+ * @private
+ */
 async function activateDemand(paymentId: string): Promise<void> {
   await prisma.demandListing.updateMany({
     where: { paymentId },
@@ -278,6 +317,14 @@ async function activateDemand(paymentId: string): Promise<void> {
 
 // --- Consultations ----------------------------------------------------------
 
+/**
+ * Récupère le statut d'un paiement (uniquement les paiements de l'utilisateur).
+ *
+ * @param paymentId - UUID du paiement.
+ * @param userId    - ID de l'utilisateur propriétaire.
+ * @returns Informations du paiement (sans metadata).
+ * @throws {AppError} 404 si paiement introuvable.
+ */
 export async function getPaymentStatus(paymentId: string, userId: string) {
   const payment = await prisma.payment.findFirst({
     where: { id: paymentId, userId },
@@ -299,8 +346,15 @@ export async function getPaymentStatus(paymentId: string, userId: string) {
 }
 
 /**
+ * Récupère le contact chiffré d'une annonce après vérification d'accès.
+ *
  * §5.3 — Ne retourne le contact réel qu'en présence d'un accès actif.
  * §5.4 — Inclut un `watermark` anti-capture d'écran.
+ *
+ * @param userId    - ID de l'acheteur (buyer).
+ * @param listingId - UUID de l'annonce.
+ * @returns `{ contactPhone, watermark, expiresAt }`.
+ * @throws {AppError} 403 si aucun accès actif.
  */
 export async function getContactAccess(userId: string, listingId: string) {
   const access = await prisma.contactAccess.findFirst({
@@ -323,6 +377,12 @@ export async function getContactAccess(userId: string, listingId: string) {
   };
 }
 
+/**
+ * Génère un watermark unique lié à l'utilisateur (anti-capture, §5.4).
+ * @param userId - ID de l'utilisateur.
+ * @returns Chaîne de watermark horodatée.
+ * @private
+ */
 function buildWatermark(userId: string): string {
   const ts = Math.floor(Date.now() / 1000);
   const short = hmacSha256(`${userId}:${ts}`).slice(0, 10);

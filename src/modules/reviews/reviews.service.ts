@@ -8,6 +8,18 @@
 import { prisma } from '../../config/prisma';
 import { AppError } from '../../utils/AppError';
 
+/**
+ * Crée un avis sur une annonce.
+ *
+ * Règles : un avis n'est possible qu'après un accès contact payé (actif ou expiré),
+ * et un seul par couple (reviewer, listing).
+ *
+ * @param input - `{ reviewerId, listingId, rating (1-5), comment? }`.
+ * @returns L'avis créé.
+ * @throws {AppError} 404 si l'annonce est introuvable.
+ * @throws {AppError} 403 si l'utilisateur n'a jamais payé l'accès contact.
+ * @throws {PrismaClientKnownRequestError} P2002 si un avis existe déjà.
+ */
 export async function create(input: { reviewerId: string; listingId: string; rating: number; comment?: string }) {
   const listing = await prisma.listing.findUnique({ where: { id: input.listingId } });
   if (!listing || listing.deletedAt) throw AppError.notFound('LISTING_NOT_FOUND', 'Annonce introuvable.');
@@ -19,21 +31,22 @@ export async function create(input: { reviewerId: string; listingId: string; rat
     throw AppError.forbidden('NO_CONTACT_ACCESS', "Vous devez avoir payé l'accès au contact pour laisser un avis.");
   }
 
-  try {
-    return await prisma.review.create({
-      data: {
-        reviewerId: input.reviewerId,
-        listingId: input.listingId,
-        rating: input.rating,
-        comment: input.comment ?? null,
-      },
-    });
-  } catch (err) {
-    // Prisma unique constraint → géré par le errorHandler (P2002).
-    throw err;
-  }
+  return prisma.review.create({
+    data: {
+      reviewerId: input.reviewerId,
+      listingId: input.listingId,
+      rating: input.rating,
+      comment: input.comment ?? null,
+    },
+  });
 }
 
+/**
+ * Liste les avis d'une annonce avec statistiques (moyenne, count).
+ *
+ * @param listingId - UUID de l'annonce.
+ * @returns `{ reviews, stats: { average, count } }`.
+ */
 export async function listForListing(listingId: string) {
   const [reviews, agg] = await Promise.all([
     prisma.review.findMany({
@@ -52,6 +65,12 @@ export async function listForListing(listingId: string) {
   return { reviews, stats: { average: agg._avg.rating ?? 0, count: agg._count._all } };
 }
 
+/**
+ * Supprime un avis (admin uniquement).
+ *
+ * @param id - UUID de l'avis.
+ * @throws {AppError} 404 si l'avis est introuvable.
+ */
 export async function remove(id: string): Promise<void> {
   const existing = await prisma.review.findUnique({ where: { id } });
   if (!existing) throw AppError.notFound('REVIEW_NOT_FOUND', 'Avis introuvable.');

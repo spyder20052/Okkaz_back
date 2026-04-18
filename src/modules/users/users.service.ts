@@ -9,6 +9,7 @@ import { prisma } from '../../config/prisma';
 import { AppError } from '../../utils/AppError';
 import { parsePagination, buildPaginationMeta } from '../../utils/pagination';
 
+/** Sélection publique d'un utilisateur (jamais de `passwordHash`). @private */
 const PUBLIC_USER_SELECT = {
   id: true,
   email: true,
@@ -24,6 +25,13 @@ const PUBLIC_USER_SELECT = {
   createdAt: true,
 } as const;
 
+/**
+ * Récupère le profil complet de l'utilisateur connecté.
+ *
+ * @param userId - ID de l'utilisateur.
+ * @returns Profil utilisateur (avec `address`, `reportsCount`).
+ * @throws {AppError} 404 si l'utilisateur n'existe pas.
+ */
 export async function getMe(userId: string) {
   const user = await prisma.user.findUnique({
     where: { id: userId },
@@ -33,6 +41,13 @@ export async function getMe(userId: string) {
   return user;
 }
 
+/**
+ * Met à jour les informations de profil de l'utilisateur connecté.
+ *
+ * @param userId - ID de l'utilisateur.
+ * @param data   - Champs modifiables : `firstName`, `lastName`, `city`, `address`, `profilePhotoUrl`.
+ * @returns Le profil mis à jour.
+ */
 export async function updateMe(
   userId: string,
   data: { firstName?: string; lastName?: string; city?: string; address?: string; profilePhotoUrl?: string },
@@ -44,6 +59,18 @@ export async function updateMe(
   });
 }
 
+/**
+ * Change le mot de passe de l'utilisateur.
+ *
+ * Vérifie l'ancien password par bcrypt, hash le nouveau,
+ * et invalide toutes les sessions actives (refresh tokens).
+ *
+ * @param userId          - ID de l'utilisateur.
+ * @param currentPassword - Mot de passe actuel.
+ * @param newPassword     - Nouveau mot de passe.
+ * @throws {AppError} 404 si l'utilisateur n'existe pas.
+ * @throws {AppError} 400 si le mot de passe actuel est invalide.
+ */
 export async function changePassword(userId: string, currentPassword: string, newPassword: string): Promise<void> {
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) throw AppError.notFound('USER_NOT_FOUND', 'Utilisateur introuvable.');
@@ -61,6 +88,15 @@ export async function changePassword(userId: string, currentPassword: string, ne
   ]);
 }
 
+/**
+ * Récupère le profil public d'un utilisateur (visible par tous).
+ *
+ * Inclut les 20 dernières annonces actives et la note moyenne.
+ *
+ * @param userId - ID de l'utilisateur.
+ * @returns Profil public avec `ratingAverage`, `ratingCount`, `activeListings`.
+ * @throws {AppError} 404 si l'utilisateur n'existe pas ou est bloqué.
+ */
 export async function getPublicProfile(userId: string) {
   const user = await prisma.user.findFirst({
     where: { id: userId, deletedAt: null, status: { not: UserStatus.BLOCKED } },
@@ -98,6 +134,13 @@ export async function getPublicProfile(userId: string) {
   };
 }
 
+/**
+ * Liste les annonces de l'utilisateur connecté (tous statuts, paginé).
+ *
+ * @param userId - ID de l'utilisateur.
+ * @param query  - Query params de pagination.
+ * @returns `{ items, meta }` — annonces paginées.
+ */
 export async function getMyListings(userId: string, query: Record<string, unknown>) {
   const { page, limit, skip } = parsePagination(query);
   const [items, total] = await Promise.all([
@@ -113,6 +156,13 @@ export async function getMyListings(userId: string, query: Record<string, unknow
   return { items, meta: buildPaginationMeta(page, limit, total) };
 }
 
+/**
+ * Liste les accès contacts achetés par l'utilisateur (paginé).
+ *
+ * @param userId - ID de l'utilisateur (buyer).
+ * @param query  - Query params de pagination.
+ * @returns `{ items, meta }` — accès paginés avec listing et paiement associés.
+ */
 export async function getMyContactAccesses(userId: string, query: Record<string, unknown>) {
   const { page, limit, skip } = parsePagination(query);
   const [items, total] = await Promise.all([
@@ -131,6 +181,13 @@ export async function getMyContactAccesses(userId: string, query: Record<string,
   return { items, meta: buildPaginationMeta(page, limit, total) };
 }
 
+/**
+ * Liste l'historique de paiements de l'utilisateur (paginé).
+ *
+ * @param userId - ID de l'utilisateur.
+ * @param query  - Query params de pagination.
+ * @returns `{ items, meta }` — paiements paginés.
+ */
 export async function getMyPayments(userId: string, query: Record<string, unknown>) {
   const { page, limit, skip } = parsePagination(query);
   const [items, total] = await Promise.all([

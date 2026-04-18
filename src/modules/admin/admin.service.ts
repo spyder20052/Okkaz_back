@@ -12,6 +12,12 @@ import { invalidateSettingsCache } from '../../services/settings.service';
 
 // --- Users ------------------------------------------------------------------
 
+/**
+ * Liste les utilisateurs (admin) avec filtrage et pagination.
+ *
+ * @param query - `{ role?, status?, kycStatus?, q? (recherche texte), page?, limit? }`.
+ * @returns `{ items, meta }` — utilisateurs paginés.
+ */
 export async function listUsers(query: Record<string, unknown>) {
   const { page, limit, skip } = parsePagination(query);
   const where: Prisma.UserWhereInput = {
@@ -58,6 +64,13 @@ export async function listUsers(query: Record<string, unknown>) {
   return { items, meta: buildPaginationMeta(page, limit, total) };
 }
 
+/**
+ * Détail complet d'un utilisateur (admin) avec KYC, listings, paiements, abonnements.
+ *
+ * @param id - UUID de l'utilisateur.
+ * @returns L'utilisateur avec toutes les relations chargées.
+ * @throws {AppError} 404 si introuvable.
+ */
 export async function getUser(id: string) {
   const user = await prisma.user.findUnique({
     where: { id },
@@ -72,18 +85,41 @@ export async function getUser(id: string) {
   return user;
 }
 
+/**
+ * Met à jour le statut d'un utilisateur (ACTIVE, SUSPENDED, BLOCKED).
+ *
+ * @param id      - UUID de l'utilisateur.
+ * @param status  - Nouveau statut.
+ * @param _reason - Raison (réservé pour audit futur).
+ * @returns L'utilisateur mis à jour.
+ * @throws {AppError} 404 si introuvable.
+ */
 export async function setUserStatus(id: string, status: UserStatus, _reason?: string) {
   await assertUserExists(id);
   logger.info({ userId: id, status }, '🟢 Admin: user status updated');
   return prisma.user.update({ where: { id }, data: { status } });
 }
 
+/**
+ * Met à jour le rôle d'un utilisateur.
+ *
+ * @param id   - UUID de l'utilisateur.
+ * @param role - Nouveau rôle (BUYER, SELLER, SELLER_PRO, ADMIN).
+ * @returns L'utilisateur mis à jour.
+ * @throws {AppError} 404 si introuvable.
+ */
 export async function setUserRole(id: string, role: UserRole) {
   await assertUserExists(id);
   logger.info({ userId: id, role }, '🟢 Admin: user role updated');
   return prisma.user.update({ where: { id }, data: { role } });
 }
 
+/**
+ * Vérifie l'existence d'un utilisateur (helper interne).
+ * @param id - UUID de l'utilisateur.
+ * @throws {AppError} 404 si introuvable.
+ * @private
+ */
 async function assertUserExists(id: string): Promise<void> {
   const exists = await prisma.user.findUnique({ where: { id }, select: { id: true } });
   if (!exists) throw AppError.notFound('USER_NOT_FOUND', 'Utilisateur introuvable.');
@@ -91,6 +127,12 @@ async function assertUserExists(id: string): Promise<void> {
 
 // --- Listings ---------------------------------------------------------------
 
+/**
+ * Liste toutes les annonces (admin) avec filtres.
+ *
+ * @param query - `{ status?, userId?, categoryId?, page?, limit? }`.
+ * @returns `{ items, meta }` — annonces paginées.
+ */
 export async function listAllListings(query: Record<string, unknown>) {
   const { page, limit, skip } = parsePagination(query);
   const where: Prisma.ListingWhereInput = {
@@ -114,6 +156,14 @@ export async function listAllListings(query: Record<string, unknown>) {
   return { items, meta: buildPaginationMeta(page, limit, total) };
 }
 
+/**
+ * Valide une annonce (passe en ACTIVE).
+ *
+ * @param id      - UUID de l'annonce.
+ * @param adminId - ID de l'admin validateur.
+ * @returns L'annonce mise à jour.
+ * @throws {AppError} 404 si introuvable.
+ */
 export async function validateListing(id: string, adminId: string) {
   const existing = await prisma.listing.findUnique({ where: { id } });
   if (!existing) throw AppError.notFound('LISTING_NOT_FOUND', 'Annonce introuvable.');
@@ -128,6 +178,15 @@ export async function validateListing(id: string, adminId: string) {
   });
 }
 
+/**
+ * Rejette une annonce (passe en REJECTED avec raison).
+ *
+ * @param id      - UUID de l'annonce.
+ * @param adminId - ID de l'admin.
+ * @param reason  - Raison du rejet.
+ * @returns L'annonce mise à jour.
+ * @throws {AppError} 404 si introuvable.
+ */
 export async function rejectListing(id: string, adminId: string, reason: string) {
   const existing = await prisma.listing.findUnique({ where: { id } });
   if (!existing) throw AppError.notFound('LISTING_NOT_FOUND', 'Annonce introuvable.');
@@ -142,6 +201,12 @@ export async function rejectListing(id: string, adminId: string, reason: string)
   });
 }
 
+/**
+ * Supprime définitivement une annonce.
+ *
+ * @param id - UUID de l'annonce.
+ * @throws {AppError} 404 si introuvable.
+ */
 export async function deleteListing(id: string): Promise<void> {
   await prisma.listing.delete({ where: { id } }).catch(() => {
     throw AppError.notFound('LISTING_NOT_FOUND', 'Annonce introuvable.');
@@ -150,6 +215,12 @@ export async function deleteListing(id: string): Promise<void> {
 
 // --- Payments ---------------------------------------------------------------
 
+/**
+ * Liste les paiements (admin) avec filtres avancés.
+ *
+ * @param query - `{ type?, status?, method?, userId?, dateFrom?, dateTo?, page?, limit? }`.
+ * @returns `{ items, meta }`.
+ */
 export async function listPayments(query: Record<string, unknown>) {
   const { page, limit, skip } = parsePagination(query);
   const where: Prisma.PaymentWhereInput = {
@@ -183,10 +254,23 @@ export async function listPayments(query: Record<string, unknown>) {
 
 // --- Settings ---------------------------------------------------------------
 
+/**
+ * Liste tous les paramètres système.
+ *
+ * @returns Tableau de `SystemSetting` trié par clé.
+ */
 export async function listSettings() {
   return prisma.systemSetting.findMany({ orderBy: { key: 'asc' } });
 }
 
+/**
+ * Crée ou met à jour un paramètre système (upsert) et invalide le cache.
+ *
+ * @param key     - Clé du paramètre.
+ * @param value   - Nouvelle valeur.
+ * @param adminId - ID de l'admin effectuant la modification.
+ * @returns Le paramètre mis à jour.
+ */
 export async function updateSetting(key: string, value: string, adminId: string) {
   const updated = await prisma.systemSetting.upsert({
     where: { key },
@@ -199,6 +283,11 @@ export async function updateSetting(key: string, value: string, adminId: string)
 
 // --- Dashboard --------------------------------------------------------------
 
+/**
+ * Statistiques agrégées du dashboard administrateur.
+ *
+ * @returns Compteurs globaux (users, listings, transactions, revenus, KYC pending, etc.).
+ */
 export async function getDashboardStats() {
   const [
     totalUsers,
@@ -232,6 +321,12 @@ export async function getDashboardStats() {
   };
 }
 
+/**
+ * Revenus groupés par période (day/week/month/year) via `date_trunc` PostgreSQL.
+ *
+ * @param params - `{ period, from?, to? }` (défaut : 30 derniers jours).
+ * @returns Tableau de `{ date, amount }`.
+ */
 export async function getRevenue(params: { period: 'day' | 'week' | 'month' | 'year'; from?: string; to?: string }) {
   const from = params.from ? new Date(params.from) : new Date(Date.now() - 30 * 86400_000);
   const to = params.to ? new Date(params.to) : new Date();
@@ -252,6 +347,12 @@ export async function getRevenue(params: { period: 'day' | 'week' | 'month' | 'y
   return rows.map((r) => ({ date: r.bucket, amount: Number(r.amount) }));
 }
 
+/**
+ * Croissance des inscriptions groupée par période.
+ *
+ * @param params - `{ period, from?, to? }`.
+ * @returns Tableau de `{ date, count }`.
+ */
 export async function getUsersGrowth(params: { period: 'day' | 'week' | 'month' | 'year'; from?: string; to?: string }) {
   const from = params.from ? new Date(params.from) : new Date(Date.now() - 30 * 86400_000);
   const to = params.to ? new Date(params.to) : new Date();
@@ -270,6 +371,11 @@ export async function getUsersGrowth(params: { period: 'day' | 'week' | 'month' 
   return rows.map((r) => ({ date: r.bucket, count: Number(r.count) }));
 }
 
+/**
+ * Top 10 des annonces actives par nombre de contacts et vues.
+ *
+ * @returns Tableau d'annonces (id, title, slug, viewsCount, contactsCount).
+ */
 export async function getTopListings() {
   return prisma.listing.findMany({
     where: { status: ListingStatus.ACTIVE, deletedAt: null },
@@ -279,6 +385,11 @@ export async function getTopListings() {
   });
 }
 
+/**
+ * Top 10 des catégories par nombre d'annonces actives.
+ *
+ * @returns Tableau de `{ category, count }`.
+ */
 export async function getTopCategories() {
   const rows = await prisma.listing.groupBy({
     by: ['categoryId'],

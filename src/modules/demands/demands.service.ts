@@ -24,6 +24,18 @@ import { getSettingNumber } from '../../services/settings.service';
 
 const DEMAND_DURATION_DAYS = 30;
 
+/**
+ * Initie une demande "Je recherche" avec paiement.
+ *
+ * Transactionnel : crée un `Payment PENDING` + une `DemandListing` en statut `CLOSED`
+ * (sera passée ACTIVE par le webhook après paiement réussi).
+ *
+ * Prix : STANDARD = 2 500 FCFA ; EXPRESS = max(5 000 FCFA, 3% de la valeur).
+ *
+ * @param input - `{ userId, categoryId, title, description, maxBudget?, city, type, propertyValue?, method, provider? }`.
+ * @returns `{ demand, payment }` — référence de paiement.
+ * @throws {AppError} 400 si la catégorie est invalide.
+ */
 export async function initiate(input: {
   userId: string;
   categoryId: string;
@@ -93,6 +105,17 @@ export async function initiate(input: {
   };
 }
 
+/**
+ * Calcule le prix d'une demande selon son type.
+ *
+ * - `STANDARD` : prix fixe depuis `settings_service`.
+ * - `EXPRESS`  : max(prix minimum, `propertyValue` × pourcentage).
+ *
+ * @param type          - Type de demande (STANDARD | EXPRESS).
+ * @param propertyValue - Valeur du bien (optionnel, utilisé pour EXPRESS).
+ * @returns Le montant en FCFA.
+ * @private
+ */
 async function computePrice(type: DemandType, propertyValue?: number): Promise<number> {
   if (type === DemandType.STANDARD) {
     return getSettingNumber('demand_listing_price', 2500);
@@ -105,14 +128,34 @@ async function computePrice(type: DemandType, propertyValue?: number): Promise<n
   return Math.max(minPrice, Math.round((propertyValue * percent) / 100));
 }
 
+/**
+ * Liste les demandes actives visibles par un SELLER_PRO (STANDARD + EXPRESS).
+ *
+ * @param userId - ID du SELLER_PRO consultant.
+ * @param query  - Params de pagination `{ page?, limit? }`.
+ * @returns `{ items, meta }`.
+ */
 export async function listForPro(userId: string, query: Record<string, unknown>) {
   return listActive(query, { onlyProVisible: true, userId });
 }
 
+/**
+ * Liste les demandes STANDARD actives (visibles par tous).
+ *
+ * @param query - Params de pagination `{ page?, limit? }`.
+ * @returns `{ items, meta }`.
+ */
 export async function listStandard(query: Record<string, unknown>) {
   return listActive(query, { onlyProVisible: false });
 }
 
+/**
+ * Fonction interne : liste les demandes actives avec filtres optionnels.
+ *
+ * @param query - Params de pagination.
+ * @param opts  - `{ onlyProVisible, userId? }`.
+ * @private
+ */
 async function listActive(query: Record<string, unknown>, opts: { onlyProVisible: boolean; userId?: string }) {
   const { page, limit, skip } = parsePagination(query);
 
@@ -136,6 +179,17 @@ async function listActive(query: Record<string, unknown>, opts: { onlyProVisible
   return { items, meta: buildPaginationMeta(page, limit, total) };
 }
 
+/**
+ * Détail d'une demande avec contrôle d'accès Express.
+ *
+ * Les demandes EXPRESS ne sont visibles que par les SELLER_PRO et ADMIN.
+ *
+ * @param id         - UUID de la demande.
+ * @param viewerRole - Rôle de l'utilisateur consultant.
+ * @returns La demande avec catégorie et infos utilisateur.
+ * @throws {AppError} 404 si introuvable.
+ * @throws {AppError} 403 si EXPRESS et viewer non-PRO.
+ */
 export async function getDetail(id: string, viewerRole: UserRole) {
   const demand = await prisma.demandListing.findUnique({
     where: { id },
@@ -151,6 +205,13 @@ export async function getDetail(id: string, viewerRole: UserRole) {
   return demand;
 }
 
+/**
+ * Liste les demandes de l'utilisateur connecté.
+ *
+ * @param userId - ID de l'utilisateur.
+ * @param query  - Params de pagination.
+ * @returns `{ items, meta }`.
+ */
 export async function listMine(userId: string, query: Record<string, unknown>) {
   const { page, limit, skip } = parsePagination(query);
   const [items, total] = await Promise.all([
@@ -166,6 +227,16 @@ export async function listMine(userId: string, query: Record<string, unknown>) {
   return { items, meta: buildPaginationMeta(page, limit, total) };
 }
 
+/**
+ * Clôture une demande (par le propriétaire ou un admin).
+ *
+ * @param id     - UUID de la demande.
+ * @param userId - ID de l'utilisateur.
+ * @param role   - Rôle de l'utilisateur.
+ * @returns La demande mise à jour.
+ * @throws {AppError} 404 si introuvable.
+ * @throws {AppError} 403 si non-propriétaire et non-admin.
+ */
 export async function close(id: string, userId: string, role: UserRole) {
   const demand = await prisma.demandListing.findUnique({ where: { id } });
   if (!demand) throw AppError.notFound('DEMAND_NOT_FOUND', 'Demande introuvable.');

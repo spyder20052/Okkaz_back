@@ -22,7 +22,9 @@ import { getSettingNumber } from "../../services/settings.service";
 import { uploadAsset } from "../../services/storage.service";
 
 /**
- * Sélection publique d'une annonce : jamais de `contactPhone` (chiffré en DB).
+ * Sélection publique : inclut photos, catégorie, propriétaire
+ * mais jamais `contactPhone` (chiffré en DB).
+ * @private
  */
 const publicListingInclude = {
   photos: { orderBy: { sortOrder: "asc" as const } },
@@ -39,6 +41,11 @@ const publicListingInclude = {
   },
 };
 
+/**
+ * Supprime le champ `contactPhone` (chiffré) d'un objet listing
+ * avant retour HTTP. Ne renvoie jamais le contact réel au front.
+ * @private
+ */
 function stripPrivateFields<T extends { contactPhone?: string }>(
   listing: T,
 ): Omit<T, "contactPhone"> {
@@ -46,6 +53,23 @@ function stripPrivateFields<T extends { contactPhone?: string }>(
   return rest;
 }
 
+/**
+ * Crée une nouvelle annonce en statut `PENDING`.
+ *
+ * Flux :
+ * 1. Vérifie que le KYC de l'utilisateur est approuvé.
+ * 2. Vérifie que l'option LOA est réservée aux SELLER_PRO.
+ * 3. Valide la catégorie.
+ * 4. Génère un slug unique à partir du titre.
+ * 5. Chiffre le numéro de contact avec AES-256-GCM.
+ *
+ * @param userId - ID de l'utilisateur (SELLER/SELLER_PRO).
+ * @param role   - Rôle de l'utilisateur.
+ * @param data   - Données de l'annonce (titre, prix, catégorie, etc.).
+ * @returns L'annonce créée (sans `contactPhone`).
+ * @throws {AppError} 403 si KYC non approuvé ou LOA demandée par un SELLER.
+ * @throws {AppError} 400 si la catégorie est invalide.
+ */
 export async function createListing(
   userId: string,
   role: UserRole,
@@ -116,6 +140,22 @@ export async function createListing(
   return stripPrivateFields(listing);
 }
 
+/**
+ * Met à jour une annonce existante.
+ *
+ * Règles :
+ * - Seul le propriétaire ou un admin peut modifier.
+ * - SELLER simple → modification repasse en `PENDING` (§6.1).
+ * - Si `contactPhone` est modifié, il est re-chiffré.
+ *
+ * @param listingId - UUID de l'annonce.
+ * @param userId    - ID de l'utilisateur.
+ * @param role      - Rôle de l'utilisateur.
+ * @param data      - Champs à mettre à jour (tous optionnels).
+ * @returns L'annonce mise à jour (sans `contactPhone`).
+ * @throws {AppError} 404 si l'annonce n'existe pas.
+ * @throws {AppError} 403 si l'utilisateur n'est pas propriétaire.
+ */
 export async function updateListing(
   listingId: string,
   userId: string,
@@ -188,6 +228,15 @@ export async function updateListing(
   return stripPrivateFields(updated);
 }
 
+/**
+ * Supprime une annonce (soft delete : `deletedAt` + statut `DELETED`).
+ *
+ * @param listingId - UUID de l'annonce.
+ * @param userId    - ID de l'utilisateur.
+ * @param role      - Rôle de l'utilisateur.
+ * @throws {AppError} 404 si l'annonce n'existe pas.
+ * @throws {AppError} 403 si l'utilisateur n'est pas propriétaire.
+ */
 export async function softDeleteListing(
   listingId: string,
   userId: string,
@@ -210,6 +259,15 @@ export async function softDeleteListing(
   });
 }
 
+/**
+ * Liste les annonces actives publiques avec filtres et pagination.
+ *
+ * Filtres : `categoryId`, `city`, `isLoa`, `minPrice`/`maxPrice`, `q`, `sort`.
+ * Les annonces `isFeatured` apparaissent en premier par défaut.
+ *
+ * @param query - Query string avec filtres et pagination.
+ * @returns `{ items, meta }` — annonces paginées (sans `contactPhone`).
+ */
 export async function listPublic(query: Record<string, unknown>) {
   const { page, limit, skip } = parsePagination(query);
 
@@ -275,6 +333,11 @@ export async function listPublic(query: Record<string, unknown>) {
   };
 }
 
+/**
+ * Liste les 20 annonces mises en avant (SELLER_PRO) les plus récentes.
+ *
+ * @returns Tableau d'annonces featured (sans `contactPhone`).
+ */
 export async function listFeatured() {
   const rows = await prisma.listing.findMany({
     where: { status: ListingStatus.ACTIVE, isFeatured: true, deletedAt: null },
@@ -285,6 +348,16 @@ export async function listFeatured() {
   return rows.map(stripPrivateFields);
 }
 
+/**
+ * Récupère le détail d'une annonce active.
+ *
+ * Incrémente le compteur de vues (fire-and-forget).
+ * Le `contactPhone` chiffré est remplacé par `contactPhoneDisplayed` (numéro WCC).
+ *
+ * @param listingId - UUID de l'annonce.
+ * @returns L'annonce détaillée avec photos, catégorie et propriétaire.
+ * @throws {AppError} 404 si l'annonce n'existe pas ou n'est pas active.
+ */
 export async function getDetail(listingId: string) {
   const listing = await prisma.listing.findFirst({
     where: { id: listingId, deletedAt: null, status: ListingStatus.ACTIVE },
@@ -310,6 +383,24 @@ export async function getDetail(listingId: string) {
 
 // --- Photos ------------------------------------------------------------------
 
+/**
+ * Ajoute des photos à une annonce.
+ *
+ * Règles :
+ * - SELLER : max 4 photos (configurable via `seller_free_max_photos`).
+ * - SELLER_PRO / ADMIN : pas de limite.
+ * - `coverIndex` désigne la photo couverture (0-based).
+ *
+ * @param listingId  - UUID de l'annonce.
+ * @param userId     - ID du propriétaire.
+ * @param role       - Rôle de l'utilisateur.
+ * @param files      - Fichiers multer à uploader.
+ * @param coverIndex - Index de la photo couverture (optionnel).
+ * @returns Tableau des photos créées.
+ * @throws {AppError} 404 si l'annonce n'existe pas.
+ * @throws {AppError} 403 si l'utilisateur n'est pas propriétaire.
+ * @throws {AppError} 400 si la limite de photos est dépassée.
+ */
 export async function addPhotos(
   listingId: string,
   userId: string,
@@ -381,6 +472,16 @@ export async function addPhotos(
   return created;
 }
 
+/**
+ * Supprime une photo d'une annonce.
+ *
+ * @param listingId - UUID de l'annonce.
+ * @param photoId   - UUID de la photo.
+ * @param userId    - ID de l'utilisateur.
+ * @param role      - Rôle de l'utilisateur.
+ * @throws {AppError} 404 si la photo n'existe pas.
+ * @throws {AppError} 403 si l'utilisateur n'est pas propriétaire.
+ */
 export async function deletePhoto(
   listingId: string,
   photoId: string,
@@ -405,6 +506,15 @@ export async function deletePhoto(
 
 // --- Pause / Resume ----------------------------------------------------------
 
+/**
+ * Met une annonce en pause (statut `PAUSED`).
+ *
+ * @param listingId - UUID de l'annonce.
+ * @param userId    - ID de l'utilisateur.
+ * @param role      - Rôle de l'utilisateur.
+ * @returns L'annonce mise à jour.
+ * @throws {AppError} 404/403.
+ */
 export async function pauseListing(
   listingId: string,
   userId: string,
@@ -413,6 +523,15 @@ export async function pauseListing(
   return setStatus(listingId, userId, role, ListingStatus.PAUSED);
 }
 
+/**
+ * Réactive une annonce en pause (retour au statut `ACTIVE`).
+ *
+ * @param listingId - UUID de l'annonce.
+ * @param userId    - ID de l'utilisateur.
+ * @param role      - Rôle de l'utilisateur.
+ * @returns L'annonce mise à jour.
+ * @throws {AppError} 404/403.
+ */
 export async function resumeListing(
   listingId: string,
   userId: string,
@@ -421,6 +540,15 @@ export async function resumeListing(
   return setStatus(listingId, userId, role, ListingStatus.ACTIVE);
 }
 
+/**
+ * Change le statut d'une annonce après vérification de la propriété.
+ * @param listingId - UUID de l'annonce.
+ * @param userId    - ID de l'utilisateur.
+ * @param role      - Rôle de l'utilisateur.
+ * @param status    - Nouveau statut.
+ * @returns L'annonce mise à jour (sans `contactPhone`).
+ * @private
+ */
 async function setStatus(
   listingId: string,
   userId: string,

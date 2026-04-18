@@ -13,6 +13,20 @@ import { AppError } from '../../utils/AppError';
 import { parsePagination, buildPaginationMeta } from '../../utils/pagination';
 import { getSettingNumber } from '../../services/settings.service';
 
+/**
+ * Crée un signalement utilisateur ou annonce.
+ *
+ * Transactionnel :
+ * 1. Résout le `reportedUserId` à partir du listing si nécessaire.
+ * 2. Crée le `Report` en statut `OPEN`.
+ * 3. Incrémente `reportsCount` sur l'utilisateur cible.
+ * 4. Si `reportsCount >= seuil` (default 5), auto-suspension du compte.
+ *
+ * @param input - `{ reporterId, reportedUserId?, listingId?, reason, description? }`.
+ * @returns Le signalement créé.
+ * @throws {AppError} 404 si l'annonce est introuvable.
+ * @throws {AppError} 400 si l'utilisateur tente de se signaler lui-même.
+ */
 export async function createReport(input: {
   reporterId: string;
   reportedUserId?: string;
@@ -63,6 +77,12 @@ export async function createReport(input: {
   return report;
 }
 
+/**
+ * Liste les signalements (admin), avec pagination et filtre par statut.
+ *
+ * @param query - Query string : `{ status?, page?, limit? }`.
+ * @returns `{ items, meta }` — signalements paginés avec reporter, reporté et listing.
+ */
 export async function listForAdmin(query: Record<string, unknown>) {
   const { page, limit, skip } = parsePagination(query);
   const where: Prisma.ReportWhereInput = query.status ? { status: query.status as ReportStatus } : {};
@@ -85,6 +105,13 @@ export async function listForAdmin(query: Record<string, unknown>) {
   return { items, meta: buildPaginationMeta(page, limit, total) };
 }
 
+/**
+ * Détail d'un signalement (admin).
+ *
+ * @param id - UUID du signalement.
+ * @returns Le signalement complet avec toutes les relations.
+ * @throws {AppError} 404 si introuvable.
+ */
 export async function getForAdmin(id: string) {
   const report = await prisma.report.findUnique({
     where: { id },
@@ -99,6 +126,15 @@ export async function getForAdmin(id: string) {
   return report;
 }
 
+/**
+ * Met à jour le statut d'un signalement (admin : RESOLVED, DISMISSED).
+ *
+ * @param id      - UUID du signalement.
+ * @param adminId - ID de l'admin qui traite.
+ * @param data    - `{ status, adminNote? }`.
+ * @returns Le signalement mis à jour.
+ * @throws {AppError} 404 si introuvable.
+ */
 export async function review(id: string, adminId: string, data: { status: ReportStatus; adminNote?: string }) {
   const existing = await prisma.report.findUnique({ where: { id } });
   if (!existing) throw AppError.notFound('REPORT_NOT_FOUND', 'Signalement introuvable.');

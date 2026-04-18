@@ -1,7 +1,6 @@
 /**
  * @module config/logger
- * @description Logger structuré Pino. Codes couleur conformes au standard
- *   défini dans AGENT.md §4 :
+ * @description Logger structuré Pino. Codes couleur conformes au standard:
  *     🟡 Auth | 🔵 Lecture | 🟢 Écriture | 🔴 Erreur
  *
  * @author KOUTON Spynel

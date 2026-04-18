@@ -1,81 +1,115 @@
 /**
  * @module utils/crypto
- * @description Chiffrement symétrique AES-256-GCM utilisé pour les numéros
- *   de contact stockés dans `listings.contact_phone` et
- *   `contact_accesses.contact_phone_revealed` (§5.3).
+ * @description Utilitaires cryptographiques bas-niveau.
  *
- *   Format du ciphertext retourné (base64) : iv(12) | tag(16) | data
+ *   - **AES-256-GCM** : chiffrement symétrique pour les données sensibles
+ *     stockées en base (numéros de téléphone de contact, données KYC…).
+ *   - **HMAC-SHA256** : signature de messages pour vérifier l'intégrité
+ *     des webhooks et générer des watermarks anti-capture.
  *
+ *   La clé de chiffrement (`ENCRYPTION_KEY`) et la clé HMAC (`HMAC_SECRET`)
+ *   sont chargées depuis les variables d'environnement validées par Zod.
+ *   Elles doivent être des chaînes hexadécimales de 64 caractères (32 octets).
+ *
+ * @see https://nodejs.org/api/crypto.html
  * @author KOUTON Spynel
  */
 
-import {
-  createCipheriv,
-  createDecipheriv,
-  randomBytes,
-  createHmac,
-  timingSafeEqual,
-} from "crypto";
+import crypto from "crypto";
 import { env } from "../config/env";
 
-const ALGO = "aes-256-gcm";
-const IV_LENGTH = 12;
-const TAG_LENGTH = 16;
+/** Algorithme de chiffrement symétrique utilisé. */
+const ALGORITHM = "aes-256-gcm";
 
-function getKey(): Buffer {
-  return Buffer.from(env.ENCRYPTION_KEY, "base64");
-}
+/** Longueur du vecteur d'initialisation (IV) en octets. */
+const IV_LENGTH = 16;
+
+/** Longueur du tag d'authentification GCM en octets. */
+const AUTH_TAG_LENGTH = 16;
+
+/** Clé de chiffrement AES-256 dérivée de la variable d'environnement. */
+const KEY = Buffer.from(env.ENCRYPTION_KEY, "base64");
 
 /**
- * Chiffre une chaîne (UTF-8) en base64.
- * @param plaintext - Texte en clair (numéro de téléphone).
- * @returns Chaîne base64 auto-contenue (iv + tag + data).
+ * Chiffre un texte en clair avec AES-256-GCM.
+ *
+ * Le résultat est une chaîne hexadécimale au format `iv:authTag:ciphertext`
+ * qui peut être stockée en toute sécurité en base de données.
+ *
+ * @param plaintext - Le texte en clair à chiffrer.
+ * @returns Chaîne hexadécimale `iv:authTag:ciphertext`.
+ * @throws {Error} Si la clé de chiffrement est invalide ou corrompue.
+ *
+ * @example
+ * ```ts
+ * const encrypted = encrypt('+22991234567');
+ * // → "a1b2c3...:d4e5f6...:78901234..."
+ * ```
  */
 export function encrypt(plaintext: string): string {
-  const iv = randomBytes(IV_LENGTH);
-  const cipher = createCipheriv(ALGO, getKey(), iv);
-  const encrypted = Buffer.concat([
+  const iv = crypto.randomBytes(IV_LENGTH);
+  const cipher = crypto.createCipheriv(ALGORITHM, KEY, iv, {
+    authTagLength: AUTH_TAG_LENGTH,
+  });
+  const enc = Buffer.concat([
     cipher.update(plaintext, "utf8"),
     cipher.final(),
   ]);
   const tag = cipher.getAuthTag();
-  return Buffer.concat([iv, tag, encrypted]).toString("base64");
+  return [iv.toString("hex"), tag.toString("hex"), enc.toString("hex")].join(
+    ":",
+  );
 }
 
 /**
- * Déchiffre une chaîne produite par {@link encrypt}.
- * @throws Si l'intégrité (tag GCM) échoue.
+ * Déchiffre une chaîne précédemment chiffrée par {@link encrypt}.
+ *
+ * Vérifie l'intégrité du message via le tag d'authentification GCM.
+ * Si les données ont été altérées, une exception est levée.
+ *
+ * @param ciphertext - Chaîne hexadécimale au format `iv:authTag:ciphertext`.
+ * @returns Le texte en clair original.
+ * @throws {Error} Si le tag d'authentification est invalide (données corrompues/altérées).
+ *
+ * @example
+ * ```ts
+ * const phone = decrypt(listing.contactPhone);
+ * // → "+22991234567"
+ * ```
  */
 export function decrypt(ciphertext: string): string {
-  const buf = Buffer.from(ciphertext, "base64");
-  const iv = buf.subarray(0, IV_LENGTH);
-  const tag = buf.subarray(IV_LENGTH, IV_LENGTH + TAG_LENGTH);
-  const data = buf.subarray(IV_LENGTH + TAG_LENGTH);
-
-  const decipher = createDecipheriv(ALGO, getKey(), iv);
+  const [ivHex, tagHex, encHex] = ciphertext.split(":");
+  const iv = Buffer.from(ivHex!, "hex");
+  const tag = Buffer.from(tagHex!, "hex");
+  const enc = Buffer.from(encHex!, "hex");
+  const decipher = crypto.createDecipheriv(ALGORITHM, KEY, iv, {
+    authTagLength: AUTH_TAG_LENGTH,
+  });
   decipher.setAuthTag(tag);
-  return Buffer.concat([decipher.update(data), decipher.final()]).toString(
+  return Buffer.concat([decipher.update(enc), decipher.final()]).toString(
     "utf8",
   );
 }
 
 /**
- * Signe un payload en HMAC-SHA256 (utilisé pour le watermark anti-capture
- * d'écran, §5.4).
+ * Génère un hash HMAC-SHA256 d'un message donné.
+ *
+ * Utilisé pour :
+ * - Vérifier la signature des webhooks KKiapay.
+ * - Construire des watermarks anti-capture d'écran (cf. `buildWatermark`).
+ *
+ * @param message - Le message à signer.
+ * @returns Hash HMAC-SHA256 encodé en hexadécimal (64 caractères).
+ *
+ * @example
+ * ```ts
+ * const signature = hmacSha256(rawBody);
+ * if (signature !== headerSignature) throw new Error('Invalid signature');
+ * ```
  */
-export function hmacSha256(
-  data: string,
-  secret: string = env.JWT_SECRET,
-): string {
-  return createHmac("sha256", secret).update(data).digest("hex");
-}
-
-/**
- * Compare deux chaînes en temps constant (évite les attaques timing).
- */
-export function constantTimeEqual(a: string, b: string): boolean {
-  const bufA = Buffer.from(a);
-  const bufB = Buffer.from(b);
-  if (bufA.length !== bufB.length) return false;
-  return timingSafeEqual(bufA, bufB);
+export function hmacSha256(message: string): string {
+  return crypto
+    .createHmac("sha256", env.HMAC_SECRET ?? env.JWT_SECRET)
+    .update(message)
+    .digest("hex");
 }

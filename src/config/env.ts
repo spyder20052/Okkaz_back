@@ -29,6 +29,8 @@ const envSchema = z.object({
     .min(32, "JWT_REFRESH_SECRET must be at least 32 chars"),
   JWT_ACCESS_EXPIRES_IN: z.string().default("15m"),
   JWT_REFRESH_EXPIRES_IN: z.string().default("30d"),
+  /** @deprecated Utiliser `JWT_ACCESS_EXPIRES_IN` — alias conservé pour compat. */
+  JWT_EXPIRES_IN: z.string().default("15m"),
 
   // Chiffrement numéros de contact
   ENCRYPTION_KEY: z.string().refine((v) => {
@@ -52,6 +54,10 @@ const envSchema = z.object({
   KKIAPAY_PRIVATE_KEY: z.string().optional(),
   KKIAPAY_SECRET_KEY: z.string().optional(),
   KKIAPAY_WEBHOOK_SECRET: z.string().optional(),
+  /** Alias global pour HMAC webhook (utilisé par `webhookSignature.ts`). */
+  WEBHOOK_SECRET: z.string().optional(),
+  /** Clé HMAC-SHA256 pour les watermarks et signatures (utilisé par `crypto.ts`). */
+  HMAC_SECRET: z.string().min(32).optional(),
   KKIAPAY_SANDBOX: z.coerce.boolean().default(true),
   CINETPAY_API_KEY: z.string().optional(),
   CINETPAY_SITE_ID: z.string().optional(),

@@ -17,13 +17,19 @@ import { env } from "../config/env";
 import { logger } from "../config/logger";
 import { AppError } from "../utils/AppError";
 
+/** Résultat d'un upload de fichier. */
 export interface UploadedAsset {
+  /** URL publique ou relative du fichier uploadé. */
   url: string;
+  /** Clé de stockage (chemin relatif au bucket/dossier). */
   key: string;
 }
 
+/** Interface de driver de stockage (local, S3, Cloudinary). */
 export interface StorageDriver {
+  /** Upload un fichier dans le dossier spécifié. */
   upload(file: Express.Multer.File, folder: string): Promise<UploadedAsset>;
+  /** Génère une URL signée temporaire (pour documents KYC). */
   signedUrl?(key: string, expiresInSec?: number): Promise<string>;
 }
 
@@ -50,6 +56,11 @@ const unimplemented: StorageDriver = {
   },
 };
 
+/**
+ * Sélectionne le driver de stockage en fonction de `STORAGE_DRIVER`.
+ * @returns L'implémentation du driver.
+ * @private
+ */
 function pickDriver(): StorageDriver {
   switch (env.STORAGE_DRIVER) {
     case "local":
@@ -68,6 +79,13 @@ function pickDriver(): StorageDriver {
 
 export const storage: StorageDriver = pickDriver();
 
+/**
+ * Upload un fichier via le driver configuré.
+ *
+ * @param file   - Fichier Multer.
+ * @param folder - Sous-dossier de destination (ex: `kyc`, `listings`).
+ * @returns `{ url, key }` du fichier uploadé.
+ */
 export async function uploadAsset(
   file: Express.Multer.File,
   folder: string,

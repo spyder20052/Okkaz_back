@@ -1,105 +1,99 @@
 /**
  * @module middlewares/errorHandler
- * @description Middleware final Express qui formate toutes les erreurs au
- *   format §7.2 du cahier des charges :
- *     { success: false, error: { code, message, details? } }
+ * @description Middleware global de gestion des erreurs Express.
  *
- *   - En dev : inclut la stack trace dans les logs.
- *   - En prod : message générique pour les erreurs non opérationnelles.
+ *   Transforme toute erreur (opérationnelle ou inattendue) en une réponse
+ *   JSON normalisée via `sendError()`. Gère spécifiquement :
+ *   - Les `AppError` (erreurs métier intentionnelles).
+ *   - Les erreurs Prisma (contraintes d'unicité, relations manquantes…).
+ *   - Les erreurs de parsing JSON.
+ *   - Les erreurs `multer` (upload de fichiers).
+ *   - Les erreurs imprévues (crash, bug) → 500 avec log `error`.
  *
  * @author KOUTON Spynel
  */
 
 import type { Request, Response, NextFunction } from "express";
 import { Prisma } from "@prisma/client";
-import { ZodError } from "zod";
+import { logger } from "../config/logger";
 import { AppError } from "../utils/AppError";
 import { sendError } from "../utils/apiResponse";
-import { logger } from "../config/logger";
-import { isProduction } from "../config/env";
 
-export function notFoundHandler(req: Request, res: Response): Response {
-  return sendError(
-    res,
-    404,
-    "ROUTE_NOT_FOUND",
-    `Route introuvable : ${req.method} ${req.originalUrl}`,
-  );
-}
-
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
+/**
+ * Middleware Express de gestion centralisée des erreurs.
+ *
+ * **Important** : doit être enregistré **en dernier** parmi les middlewares
+ * Express (via `app.use(errorHandler)`) pour intercepter toutes les erreurs
+ * propagées par `asyncHandler` ou `next(err)`.
+ *
+ * Flux de traitement :
+ * 1. Si l'erreur est une `AppError` → retourne le `statusCode` et le `code` métier.
+ * 2. Si c'est une erreur Prisma connue → convertit en réponse HTTP adaptée :
+ *    - `P2002` (contrainte unique) → 409 Conflict.
+ *    - `P2025` (record not found) → 404 Not Found.
+ *    - `P2003` (foreign key violation) → 400 Bad Request.
+ * 3. Si c'est une `SyntaxError` de parsing JSON → 400.
+ * 4. Si c'est une erreur `multer` → 400 avec message descriptif.
+ * 5. Sinon → 500 Internal Server Error + log `error` level.
+ *
+ * @param err  - L'erreur capturée (de n'importe quel type).
+ * @param req  - Requête Express (utilisée pour le contexte dans les logs).
+ * @param res  - Réponse Express.
+ * @param _next - Callback `next` Express (requis par la signature du error handler, non utilisé).
+ */
 export function errorHandler(
   err: unknown,
   req: Request,
   res: Response,
   _next: NextFunction,
-): Response {
-  // Erreurs applicatives connues → on leur fait confiance.
+): void {
+  // ── AppError (erreur métier) ──────────────────────────────────────
   if (err instanceof AppError) {
-    if (err.statusCode >= 500) {
-      logger.error({ err, path: req.originalUrl }, "Application error");
-    } else {
-      logger.warn({ code: err.code, path: req.originalUrl }, err.message);
-    }
-    return sendError(res, err.statusCode, err.code, err.message, err.details);
+    sendError(res, err.statusCode, err.code, err.message, err.details);
+    return;
   }
 
-  // Zod (peut surgir en dehors de validateRequest).
-  if (err instanceof ZodError) {
-    const details = err.issues.map((i) => ({
-      path: i.path.join("."),
-      message: i.message,
-    }));
-    return sendError(
-      res,
-      422,
-      "VALIDATION_ERROR",
-      "Requête invalide.",
-      details,
-    );
-  }
-
-  // Prisma — erreurs connues.
+  // ── Prisma : contrainte d'unicité ────────────────────────────────
   if (err instanceof Prisma.PrismaClientKnownRequestError) {
-    logger.warn(
-      { code: err.code, meta: err.meta, path: req.originalUrl },
-      "Prisma known error",
-    );
     if (err.code === "P2002") {
-      return sendError(
-        res,
-        409,
-        "UNIQUE_CONSTRAINT",
-        "Conflit : une ressource avec ces valeurs existe déjà.",
-        err.meta,
-      );
+      const target = (err.meta?.target as string[])?.join(", ") ?? "champ";
+      sendError(res, 409, "DUPLICATE_ENTRY", `La valeur de ${target} existe déjà.`);
+      return;
     }
     if (err.code === "P2025") {
-      return sendError(
-        res,
-        404,
-        "RESOURCE_NOT_FOUND",
-        "Ressource introuvable.",
-      );
+      sendError(res, 404, "RECORD_NOT_FOUND", "Ressource introuvable.");
+      return;
+    }
+    if (err.code === "P2003") {
+      const field = (err.meta?.field_name as string) ?? "relation";
+      sendError(res, 400, "FOREIGN_KEY_VIOLATION", `Référence invalide : ${field}.`);
+      return;
     }
   }
 
+  // ── Prisma : erreur de validation interne ────────────────────────
   if (err instanceof Prisma.PrismaClientValidationError) {
-    logger.warn({ path: req.originalUrl }, "Prisma validation error");
-    return sendError(
-      res,
-      400,
-      "DB_VALIDATION_ERROR",
-      "Paramètres invalides pour la base de données.",
-    );
+    logger.warn({ err }, "Prisma validation error");
+    sendError(res, 400, "DB_VALIDATION_ERROR", "Données invalides pour la base de données.");
+    return;
   }
 
-  // Fallback — tout le reste.
-  logger.error({ err, path: req.originalUrl }, "Unhandled error");
-  const message = isProduction
-    ? "Erreur serveur interne."
-    : err instanceof Error
-      ? err.message
-      : "Erreur inconnue.";
-  return sendError(res, 500, "INTERNAL_ERROR", message);
+  // ── JSON malformé ────────────────────────────────────────────────
+  if (err instanceof SyntaxError && "body" in err) {
+    sendError(res, 400, "INVALID_JSON", "Le corps de la requête n'est pas du JSON valide.");
+    return;
+  }
+
+  // ── Multer (upload) ──────────────────────────────────────────────
+  if (err && typeof err === "object" && "code" in err && (err as { code?: string }).code === "LIMIT_FILE_SIZE") {
+    sendError(res, 400, "FILE_TOO_LARGE", "Le fichier dépasse la taille maximale autorisée.");
+    return;
+  }
+
+  // ── Erreur imprévue (bug, crash) ─────────────────────────────────
+  logger.error(
+    { err, method: req.method, url: req.originalUrl },
+    "🔴 Unhandled error",
+  );
+  sendError(res, 500, "INTERNAL_ERROR", "Erreur serveur interne.");
 }

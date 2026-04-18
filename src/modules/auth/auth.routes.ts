@@ -7,7 +7,7 @@ import { Router } from 'express';
 import * as controller from './auth.controller';
 import * as schemas from './auth.validator';
 import { validateRequest } from '../../middlewares/validateRequest';
-import { authRateLimiter } from '../../middlewares/rateLimit';
+import { authLimiter } from '../../middlewares/rateLimit';
 import { authenticate } from '../../middlewares/authenticate';
 import { asyncHandler } from '../../utils/asyncHandler';
 
@@ -15,14 +15,14 @@ const router = Router();
 
 router.post(
   '/register',
-  authRateLimiter,
+  authLimiter,
   validateRequest({ body: schemas.registerSchema }),
   asyncHandler(controller.register),
 );
 
 router.post(
   '/login',
-  authRateLimiter,
+  authLimiter,
   validateRequest({ body: schemas.loginSchema }),
   asyncHandler(controller.login),
 );
@@ -43,7 +43,7 @@ router.get(
 
 router.post(
   '/forgot-password',
-  authRateLimiter,
+  authLimiter,
   validateRequest({ body: schemas.forgotPasswordSchema }),
   asyncHandler(controller.forgotPassword),
 );

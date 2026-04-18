@@ -18,6 +18,12 @@ import { logger } from "../config/logger";
 
 let transporter: Transporter | null = null;
 
+/**
+ * Initialise et retourne le transporter Nodemailer (singleton lazy).
+ * En dev/test sans SMTP configuré, utilise un `jsonTransport` (log only).
+ * @returns Instance Nodemailer Transporter.
+ * @private
+ */
 function getTransporter(): Transporter {
   if (transporter) return transporter;
   if (!env.SMTP_HOST || !env.SMTP_PORT) {
@@ -44,6 +50,13 @@ export interface MailInput {
   html?: string;
 }
 
+/**
+ * Envoie un email transactionnel.
+ *
+ * En cas d'erreur, l'échec est logué mais ne fait **pas** échouer la requête HTTP.
+ *
+ * @param params - `{ to, subject, text, html? }`.
+ */
 export async function sendMail({
   to,
   subject,
@@ -68,6 +81,13 @@ export async function sendMail({
   }
 }
 
+/**
+ * Construit le contenu email de vérification d'adresse (§4.1).
+ *
+ * @param token     - Token de vérification.
+ * @param firstName - Prénom de l'utilisateur.
+ * @returns `{ subject, text, html }`.
+ */
 export function buildVerifyEmailHtml(
   token: string,
   firstName: string,
@@ -80,6 +100,13 @@ export function buildVerifyEmailHtml(
   };
 }
 
+/**
+ * Construit le contenu email de réinitialisation de mot de passe (§4.1).
+ *
+ * @param token     - Token de reset.
+ * @param firstName - Prénom de l'utilisateur.
+ * @returns `{ subject, text, html }`.
+ */
 export function buildResetPasswordHtml(
   token: string,
   firstName: string,
