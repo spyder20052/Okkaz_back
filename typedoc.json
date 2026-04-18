@@ -1,0 +1,27 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "entryPoints": ["src"],
+  "entryPointStrategy": "expand",
+  "out": "docs/typedoc",
+  "name": "OKKAZ Backend — Documentation API",
+  "tsconfig": "tsconfig.json",
+  "exclude": [
+    "**/*.test.ts",
+    "**/*.spec.ts",
+    "**/tests/**",
+    "**/node_modules/**",
+    "**/dist/**"
+  ],
+  "excludePrivate": false,
+  "excludeInternal": false,
+  "includeVersion": true,
+  "readme": "README.md",
+  "categorizeByGroup": true,
+  "sort": ["source-order"],
+  "plugin": [],
+  "theme": "default",
+  "navigation": {
+    "includeCategories": true,
+    "includeGroups": true
+  }
+}
