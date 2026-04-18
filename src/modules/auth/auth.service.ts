@@ -45,6 +45,12 @@ interface PublicUser {
   isEmailVerified: boolean;
 }
 
+/**
+ * Projette un utilisateur DB en objet public (sans `passwordHash`, etc.).
+ * @param u - Objet utilisateur brut depuis Prisma.
+ * @returns Objet PublicUser sécurisé.
+ * @private
+ */
 function toPublicUser(u: {
   id: string;
   email: string;
@@ -69,6 +75,13 @@ function toPublicUser(u: {
   };
 }
 
+/**
+ * Génère un access token JWT + un refresh token stocké en DB.
+ * @param userId - ID de l'utilisateur.
+ * @param role   - Rôle de l'utilisateur.
+ * @returns `{ accessToken, refreshToken }`.
+ * @private
+ */
 async function issueTokens(
   userId: string,
   role: UserRole,
@@ -81,6 +94,16 @@ async function issueTokens(
   return { accessToken, refreshToken: token };
 }
 
+/**
+ * Inscription d'un nouvel utilisateur.
+ *
+ * Flux : hachage bcrypt → création en DB → envoi email de vérification → émission tokens.
+ * Un SELLER démarre en `PENDING_KYC`, un BUYER en `ACTIVE`.
+ *
+ * @param input - Données d'inscription (email, phone, password, firstName, lastName, role).
+ * @returns `{ user, tokens }`.
+ * @throws {AppError} 409 si un compte existe déjà avec cet email/téléphone.
+ */
 export async function register(
   input: RegisterInput,
 ): Promise<{ user: PublicUser; tokens: AuthTokens }> {
@@ -123,6 +146,16 @@ export async function register(
   return { user: toPublicUser(user), tokens };
 }
 
+/**
+ * Connexion par email ou téléphone + mot de passe.
+ *
+ * Vérifie le statut du compte (bloqué → 403) et compare le hash bcrypt.
+ *
+ * @param input - `{ email?, phone?, password }`.
+ * @returns `{ user, tokens }`.
+ * @throws {AppError} 401 si identifiants invalides.
+ * @throws {AppError} 403 si compte bloqué.
+ */
 export async function login(
   input: LoginInput,
 ): Promise<{ user: PublicUser; tokens: AuthTokens }> {
@@ -162,6 +195,15 @@ export async function login(
   return { user: toPublicUser(user), tokens };
 }
 
+/**
+ * Rafraîchit les tokens (rotation securisée).
+ *
+ * L'ancien refresh token est révoqué, un nouveau couple access/refresh est émis.
+ *
+ * @param refreshToken - Token de rafraîchissement.
+ * @returns `{ accessToken, refreshToken }`.
+ * @throws {AppError} 401 si token invalide ou expiré.
+ */
 export async function refresh(refreshToken: string): Promise<AuthTokens> {
   const hash = hashToken(refreshToken);
   const row = await prisma.refreshToken.findUnique({
@@ -186,6 +228,11 @@ export async function refresh(refreshToken: string): Promise<AuthTokens> {
   return issueTokens(row.userId, row.user.role);
 }
 
+/**
+ * Déconnexion : révoque le refresh token.
+ *
+ * @param refreshToken - Token à révoquer.
+ */
 export async function logout(refreshToken: string): Promise<void> {
   const hash = hashToken(refreshToken);
   await prisma.refreshToken.updateMany({
@@ -194,6 +241,12 @@ export async function logout(refreshToken: string): Promise<void> {
   });
 }
 
+/**
+ * Vérifie l'email de l'utilisateur via un jeton unique.
+ *
+ * @param token - Jeton de vérification envoyé par email.
+ * @throws {AppError} 400 si jeton invalide.
+ */
 export async function verifyEmail(token: string): Promise<void> {
   const user = await prisma.user.findFirst({
     where: { emailVerificationToken: token },
@@ -210,6 +263,14 @@ export async function verifyEmail(token: string): Promise<void> {
   logger.info({ userId: user.id }, "🟡 Email verified");
 }
 
+/**
+ * Initie la procédure de réinitialisation de mot de passe.
+ *
+ * Génère un token et envoie un email avec le lien de reset.
+ * Ne révèle pas si l'email existe (privacy : réponse toujours 200).
+ *
+ * @param email - Adresse email de l'utilisateur.
+ */
 export async function forgotPassword(email: string): Promise<void> {
   const user = await prisma.user.findUnique({ where: { email } });
   // On ne révèle pas si l'email existe (privacy). La réponse reste 200.
@@ -226,6 +287,15 @@ export async function forgotPassword(email: string): Promise<void> {
   void sendMail({ to: user.email, ...mail });
 }
 
+/**
+ * Réinitialise le mot de passe via un token.
+ *
+ * Transactionnel : met à jour le hash + invalide toutes les sessions actives.
+ *
+ * @param token       - Token de réinitialisation.
+ * @param newPassword - Nouveau mot de passe en clair (sera hashé).
+ * @throws {AppError} 400 si token invalide ou expiré.
+ */
 export async function resetPassword(
   token: string,
   newPassword: string,
