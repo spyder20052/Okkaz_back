@@ -1,12 +1,12 @@
 // =============================================================================
 // OKKAZ Backend — Prisma Schema
 // -----------------------------------------------------------------------------
-// Conforme au Cahier des Charges Technique Backend v1.0 (Avril 2026), §3.
+// Conforme au Cahier des Charges Technique Backend v1.0 (Avril 2026).
 // Conventions :
 //   - Clés primaires UUID (DEFAULT gen_random_uuid())
 //   - Timestamps created_at / updated_at sur chaque table
 //   - Soft delete (deleted_at) sur entités sensibles (users, listings)
-//   - Tables snake_case pluriel, colonnes snake_case (§7.1)
+//   - Tables snake_case pluriel, colonnes snake_case
 //   - Cartographie @map pour respecter les conventions PostgreSQL côté DB
 //     tout en conservant du camelCase côté TypeScript.
 // =============================================================================
