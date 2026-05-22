@@ -42,6 +42,20 @@ const publicListingInclude = {
 };
 
 /**
+ * Sélection allégée pour les listes : inclut uniquement la photo de couverture
+ * pour optimiser les performances.
+ * @private
+ */
+const listListingInclude = {
+  ...publicListingInclude,
+  photos: {
+    where: { isCover: true },
+    take: 1,
+  },
+};
+
+
+/**
  * Supprime le champ `contactPhone` (chiffré) d'un objet listing
  * avant retour HTTP. Ne renvoie jamais le contact réel au front.
  * @private
@@ -322,7 +336,7 @@ export async function listPublic(query: Record<string, unknown>) {
       orderBy,
       skip,
       take: limit,
-      include: publicListingInclude,
+      include: listListingInclude,
     }),
     prisma.listing.count({ where }),
   ]);
@@ -343,7 +357,7 @@ export async function listFeatured() {
     where: { status: ListingStatus.ACTIVE, isFeatured: true, deletedAt: null },
     orderBy: { createdAt: "desc" },
     take: 20,
-    include: publicListingInclude,
+    include: listListingInclude,
   });
   return rows.map(stripPrivateFields);
 }

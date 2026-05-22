@@ -11,7 +11,7 @@ const router = Router();
 router.post(
   '/',
   authenticate,
-  authorize('BUYER'),
+  authorize('BUYER', 'SELLER', 'SELLER_PRO'),
   validateRequest({ body: schemas.createReviewSchema }),
   asyncHandler(controller.create),
 );

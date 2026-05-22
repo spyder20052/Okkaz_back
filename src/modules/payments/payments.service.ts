@@ -8,7 +8,7 @@
  *     3. Retourne une référence à utiliser côté frontend avec le SDK KKiapay.
  *
  *   Flux webhook :
- *     1. Signature HMAC vérifiée en amont (middleware).
+ *     1. Secret `x-kkiapay-secret` vérifié en amont (middleware).
  *     2. Marque le Payment SUCCESS/FAILED.
  *     3. Si SUCCESS et type=CONTACT_ACCESS → crée un ContactAccess chiffré.
  *     4. Si SUCCESS et type=SUBSCRIPTION → active l'abonnement et passe le
@@ -140,11 +140,19 @@ export async function initiateContactAccess(
 }
 
 export interface KkiapayWebhookBody {
-  status?: "SUCCESS" | "FAILED";
   transactionId?: string;
-  reference?: string;
-  providerRef?: string;
-  data?: Record<string, unknown>;
+  isPaymentSucces?: boolean; // Typo in Kkiapay's API (Succes instead of Success)
+  event?: string; // e.g. "transaction.success" or "transaction.failed"
+  account?: string;
+  failureCode?: string;
+  failureMessage?: string;
+  label?: string;
+  method?: string;
+  amount?: number;
+  fees?: number;
+  partnerId?: string; // Recommended to pass custom ID via KKiapay SDK
+  performedAt?: string;
+  stateData?: Record<string, unknown> | string; // Alternative to partnerId
 }
 
 /**
@@ -156,7 +164,27 @@ export interface KkiapayWebhookBody {
  * @param body - Payload du webhook KKiapay.
  */
 export async function handleWebhook(body: KkiapayWebhookBody): Promise<void> {
-  const ref = body.providerRef ?? body.reference ?? body.transactionId;
+  // Extract custom providerRef from partnerId or stateData
+  let ref = body.partnerId;
+  
+  if (!ref && body.stateData) {
+    if (typeof body.stateData === "string") {
+      try {
+        const parsed = JSON.parse(body.stateData);
+        ref = parsed.providerRef ?? parsed.orderId;
+      } catch {
+        ref = body.stateData;
+      }
+    } else if (typeof body.stateData === "object" && body.stateData !== null) {
+      ref = (body.stateData.providerRef as string) ?? (body.stateData.orderId as string);
+    }
+  }
+
+  // Fallback to transactionId if no custom ref is found
+  if (!ref) {
+    ref = body.transactionId;
+  }
+
   if (!ref) {
     logger.warn({ body }, "Webhook sans référence de transaction");
     return;
@@ -174,14 +202,24 @@ export async function handleWebhook(body: KkiapayWebhookBody): Promise<void> {
     return;
   }
 
-  const newStatus =
-    body.status === "SUCCESS" ? PaymentStatus.SUCCESS : PaymentStatus.FAILED;
+  // Determine status from `isPaymentSucces` boolean or `event` string
+  const isSuccess = body.isPaymentSucces === true || body.event === "transaction.success";
+  const newStatus = isSuccess ? PaymentStatus.SUCCESS : PaymentStatus.FAILED;
 
   const existingMeta =
     (payment.metadata as Record<string, unknown> | null) ?? {};
   const updatedMeta = {
     ...existingMeta,
-    webhook: body.data ?? null,
+    webhook: {
+      transactionId: body.transactionId ?? null,
+      event: body.event ?? null,
+      method: body.method ?? null,
+      amount: body.amount ?? null,
+      fees: body.fees ?? null,
+      performedAt: body.performedAt ?? null,
+      failureCode: body.failureCode ?? null,
+      failureMessage: body.failureMessage ?? null,
+    },
   } as Prisma.JsonObject;
 
   await prisma.payment.update({

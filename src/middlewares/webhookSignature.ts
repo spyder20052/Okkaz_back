@@ -17,45 +17,47 @@ import { env } from "../config/env";
 import { AppError } from "../utils/AppError";
 
 /**
- * Factory de middleware qui vérifie la signature HMAC-SHA256 d'un webhook.
+ * Factory de middleware qui vérifie le secret d'un webhook KKiapay.
  *
  * Flux :
- * 1. Récupère le raw body depuis `req.rawBody` (capturé par le middleware
- *    bodyParser avec l'option `verify`).
- * 2. Récupère la signature du header `x-webhook-signature`.
- * 3. Calcule le HMAC attendu avec `WEBHOOK_SECRET`.
- * 4. Compare les deux signatures avec `crypto.timingSafeEqual()`.
- * 5. Si mismatch → 401 Unauthorized (log warning).
+ * 1. Récupère le secret depuis le header `x-kkiapay-secret`.
+ * 2. Le compare au secret attendu (`KKIAPAY_WEBHOOK_SECRET`) avec `crypto.timingSafeEqual()`
+ *    pour éviter les timing attacks.
+ * 3. Si mismatch ou absent → 401 Unauthorized (log warning).
  *
- * @param headerName - Nom du header HTTP contenant la signature (défaut : `'x-webhook-signature'`).
- * @returns Middleware Express vérifiant la signature.
+ * @param headerName - Nom du header HTTP contenant le secret (défaut : `'x-kkiapay-secret'`).
+ * @returns Middleware Express vérifiant le secret.
  *
  * @example
  * ```ts
  * router.post('/payments/webhook', webhookSignature(), asyncHandler(controller.webhook));
  * ```
  *
- * @throws {AppError} 401 si la signature est absente ou ne correspond pas.
+ * @throws {AppError} 401 si le secret est absent ou ne correspond pas.
  */
-export function webhookSignature(headerName = "x-webhook-signature") {
+export function webhookSignature(headerName = "x-kkiapay-secret") {
   return (req: Request, _res: Response, next: NextFunction): void => {
     const signature = req.headers[headerName] as string | undefined;
-    const rawBody = (req as Request & { rawBody?: Buffer }).rawBody;
 
-    if (!signature || !rawBody) {
+    if (!signature) {
       throw AppError.unauthorized(
         "WEBHOOK_SIGNATURE_MISSING",
-        "Signature webhook manquante.",
+        "Secret webhook manquant.",
       );
     }
 
-    const expected = crypto
-      .createHmac("sha256", env.WEBHOOK_SECRET ?? env.KKIAPAY_WEBHOOK_SECRET ?? "")
-      .update(rawBody)
-      .digest("hex");
+    const expected = env.WEBHOOK_SECRET ?? env.KKIAPAY_WEBHOOK_SECRET ?? "";
+    
+    // Fallback if empty
+    if (!expected) {
+      throw AppError.unauthorized(
+        "WEBHOOK_SECRET_NOT_CONFIGURED",
+        "Secret webhook non configuré sur le serveur.",
+      );
+    }
 
-    const sigBuffer = Buffer.from(signature, "hex");
-    const expectedBuffer = Buffer.from(expected, "hex");
+    const sigBuffer = Buffer.from(signature);
+    const expectedBuffer = Buffer.from(expected);
 
     if (
       sigBuffer.length !== expectedBuffer.length ||
@@ -63,7 +65,7 @@ export function webhookSignature(headerName = "x-webhook-signature") {
     ) {
       throw AppError.unauthorized(
         "WEBHOOK_SIGNATURE_INVALID",
-        "Signature webhook invalide.",
+        "Secret webhook invalide.",
       );
     }
 

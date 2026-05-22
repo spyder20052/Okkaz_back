@@ -29,8 +29,8 @@ router.post(
   asyncHandler(controller.initiateContactAccess),
 );
 
-// Webhook public protégé par signature HMAC (cf. §5.1).
-router.post('/webhook', webhookSignature('x-kkiapay-signature'), asyncHandler(controller.webhook));
+// Webhook public protégé par vérification du secret KKiapay (cf. §5.1).
+router.post('/webhook', webhookSignature('x-kkiapay-secret'), asyncHandler(controller.webhook));
 
 router.get(
   '/contact-access/:listing_id',

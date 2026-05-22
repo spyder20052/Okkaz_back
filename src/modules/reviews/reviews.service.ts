@@ -24,6 +24,10 @@ export async function create(input: { reviewerId: string; listingId: string; rat
   const listing = await prisma.listing.findUnique({ where: { id: input.listingId } });
   if (!listing || listing.deletedAt) throw AppError.notFound('LISTING_NOT_FOUND', 'Annonce introuvable.');
 
+  if (listing.userId === input.reviewerId) {
+    throw AppError.forbidden('CANNOT_REVIEW_SELF', 'Vous ne pouvez pas évaluer votre propre annonce.');
+  }
+
   const hadAccess = await prisma.contactAccess.findFirst({
     where: { userId: input.reviewerId, listingId: input.listingId },
   });
