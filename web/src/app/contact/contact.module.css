@@ -283,7 +283,9 @@
 
 .sticker {
   position: absolute;
-  display: inline-flex;
+  display: inline-grid;
+  grid-template-areas: "stack";
+  overflow: hidden;
   min-height: clamp(2.75rem, 4vw, 3.9rem);
   align-items: center;
   justify-content: center;
@@ -301,8 +303,33 @@
   transition: transform 0.2s ease;
 }
 
+.stickerText {
+  grid-area: stack;
+  display: inline-block;
+  transition: transform 0.3s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.25s ease;
+}
+
+.stickerHoverText {
+  grid-area: stack;
+  display: inline-block;
+  transform: translateY(150%);
+  opacity: 0;
+  white-space: nowrap;
+  transition: transform 0.3s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.25s ease;
+}
+
 .sticker:hover {
   transform: translateY(-3px) rotate(var(--rotation));
+}
+
+.sticker:hover .stickerText {
+  transform: translateY(-150%);
+  opacity: 0;
+}
+
+.sticker:hover .stickerHoverText {
+  transform: translateY(0);
+  opacity: 1;
 }
 
 .socialHint {

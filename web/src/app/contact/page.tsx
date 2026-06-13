@@ -104,7 +104,8 @@ export default function ContactPage() {
               href={item.href}
               className={`${styles.sticker} ${item.tone} ${styles[`sticker${index + 1}`]}`}
             >
-              {item.label}
+              <span className={styles.stickerText}>{item.label}</span>
+              <span className={styles.stickerHoverText}>Clique-moi !</span>
             </Link>
           ))}
           <a className={styles.mailWatermark} href="mailto:contact@okkaz.bj">
