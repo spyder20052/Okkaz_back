@@ -21,7 +21,7 @@ export default function AdminReglagesPage() {
           <article className={styles.simulator}>
             <h2>Regles plateforme</h2>
             <label>
-              Commission mise en contact
+              Option Numéro Direct
               <input type="text" defaultValue="2 500 FCFA" />
             </label>
             <label>

@@ -8,8 +8,8 @@ const FAQS = [
     "Ouvrez l'annonce, vérifiez les détails, puis contactez OKKAZ pour confirmer les conditions avec le propriétaire.",
   ],
   [
-    "La LOA est-elle disponible pour tous les biens ?",
-    "La LOA dépend du type de bien, du propriétaire et de la validation du profil demandeur.",
+    "L'option Achat / Vente est-elle disponible pour tous les biens ?",
+    "L'option Achat / Vente dépend du type de bien, du propriétaire et de la validation du profil demandeur.",
   ],
   [
     "Comment publier un bien sur OKKAZ ?",
@@ -67,7 +67,7 @@ export default function FaqPage() {
           <span className={`${styles.contactSticker} ${styles.stickerImpact}`}>Impact local</span>
           <span className={`${styles.contactSticker} ${styles.stickerGood}`}>Location simple</span>
           <span className={`${styles.contactSticker} ${styles.stickerThumb}`}>+</span>
-          <span className={`${styles.contactSticker} ${styles.stickerChange}`}>LOA dispo</span>
+          <span className={`${styles.contactSticker} ${styles.stickerChange}`}>Achat / Vente</span>
           <span className={`${styles.contactSticker} ${styles.stickerCall}`}>Call me!</span>
         </div>
         <h2>CONTACTS</h2>

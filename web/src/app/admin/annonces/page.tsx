@@ -143,7 +143,7 @@ export default function AdminAnnoncesPage() {
                       </span>
                       <span>
                         <small>Mode</small>
-                        {ad.loaPossible ? "LOA possible" : "Location"}
+                        {ad.loaPossible ? "Achat / Vente" : "Location"}
                       </span>
                     </div>
                   </div>

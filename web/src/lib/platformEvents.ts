@@ -1,4 +1,4 @@
-export type PlatformEventType = "contact_reveal" | "subscription_payment" | "boost_payment" | "search_request";
+export type PlatformEventType = "direct_number_payment" | "subscription_payment" | "boost_payment" | "booking_payment" | "search_request";
 
 export type PlatformEvent = {
   id: string;
@@ -14,11 +14,11 @@ export const PLATFORM_EVENTS_KEY = "okkaz_platform_events";
 
 export const seedPlatformEvents: PlatformEvent[] = [
   {
-    id: "EVT-CONTACT-2401",
-    type: "contact_reveal",
-    title: "Numero vendeur devoile",
-    detail: "Jean Dupont a paye la reservation Mercedes-Benz Classe G.",
-    amount: 450000,
+    id: "EVT-DIR-2401",
+    type: "direct_number_payment",
+    title: "Option numéro direct payée",
+    detail: "Jean Dupont a payé l'option numéro direct pour Mercedes-Benz Classe G.",
+    amount: 2500,
     status: "done",
     createdAt: "Aujourd'hui",
   },

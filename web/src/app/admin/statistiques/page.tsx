@@ -3,7 +3,7 @@ import styles from "../admin.module.css";
 
 const stats = [
   { label: "Utilisateurs actifs", value: "608", meta: "Objectif 600 atteint" },
-  { label: "LOA actives", value: "74", meta: "400 visees sur 24 mois" },
+  { label: "Achat / Vente actifs", value: "74", meta: "400 visees sur 24 mois" },
   { label: "Proprietaires", value: "126", meta: "120 objectif atteint" },
   { label: "Litiges reduits", value: "42%", meta: "vers objectif 50%" },
 ];
@@ -41,7 +41,7 @@ export default function AdminStatistiquesPage() {
           <div className={styles.cardHeader}>
             <div>
               <h2>Performance hebdomadaire</h2>
-              <p><span>+12%</span> demandes qualifiees</p>
+              <p><span>+12%</span> volume d&apos;annonces</p>
             </div>
             <button type="button">Mensuel</button>
           </div>

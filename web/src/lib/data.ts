@@ -30,6 +30,7 @@ export interface Ad {
   requirements: string[];
   security: string[];
   usageRules: string[];
+  directNumber: boolean;
 }
 
 export interface SearchRequest {
@@ -55,7 +56,7 @@ export const mockAds: Ad[] = [
     totalPrice: 12500000,
     deposit: 300000,
     minimumDuration: "1 mois",
-    rentalMode: "Location mensuelle avec option d'achat",
+    rentalMode: "Achat / Vente",
     condition: "Excellent état",
     availability: "Disponible cette semaine",
     pickup: "Retrait sur rendez-vous à Fidjrossè",
@@ -66,18 +67,19 @@ export const mockAds: Ad[] = [
     ownerPhone: "+229 01 97 42 18 60",
     ownerType: "Professionnel vérifié",
     ownerResponseTime: "Réponse moyenne sous 2h",
-    description: "Mercedes-Benz Classe G entretenue, propre et prête pour location premium. L'annonce convient aux particuliers ou entreprises qui souhaitent louer avant d'acheter progressivement via une LOA encadrée.",
+    description: "Mercedes-Benz Classe G entretenue, propre et prête pour location premium. L'annonce convient aux particuliers ou entreprises qui souhaitent louer ou acheter via un contrat d'achat / vente.",
     loaPossible: true,
     loaDuration: "12 à 24 mois",
     paymentTerms: "Premier mois + caution avant remise du véhicule",
     warranty: "Caution remboursable après état des lieux retour",
     cancellationPolicy: "Annulation gratuite avant validation finale du rendez-vous",
     verifiedAt: "Contrôlée par OKKAZ le 18 mai 2026",
-    highlights: ["Boîte automatique", "Climatisation", "Intérieur cuir", "LOA encadrée"],
+    highlights: ["Boîte automatique", "Climatisation", "Intérieur cuir", "Achat / Vente"],
     included: ["Assurance de base", "Contrôle mécanique", "Assistance propriétaire"],
     requirements: ["Pièce d'identité", "Justificatif de revenus", "Caution remboursable"],
     security: ["Annonce vérifiée", "Contrat digital OKKAZ", "Paiement suivi"],
     usageRules: ["Permis de conduire valide obligatoire", "Usage hors Bénin soumis à accord", "Carburant à la charge du locataire"],
+    directNumber: true,
   },
   {
     id: "2",
@@ -88,7 +90,7 @@ export const mockAds: Ad[] = [
     totalPrice: 65000000,
     deposit: 1000000,
     minimumDuration: "3 mois",
-    rentalMode: "Location longue durée avec option d'achat",
+    rentalMode: "Achat / Vente",
     condition: "Neuf",
     availability: "Disponible immédiatement",
     pickup: "Visite à Arconville sur rendez-vous",
@@ -111,6 +113,7 @@ export const mockAds: Ad[] = [
     requirements: ["Pièce d'identité", "Garant ou justificatif", "Caution de deux mois"],
     security: ["Propriétaire vérifié", "Documents contrôlés", "Suivi OKKAZ"],
     usageRules: ["Sous-location interdite sans accord", "Charges courantes à la charge du locataire", "Travaux soumis à validation écrite"],
+    directNumber: false,
   },
   {
     id: "3",
@@ -144,6 +147,7 @@ export const mockAds: Ad[] = [
     requirements: ["Pièce d'identité", "Numéro Mobile Money actif", "Caution"],
     security: ["IMEI vérifié", "Contrat digital", "Paiement Mobile Money"],
     usageRules: ["Compte iCloud personnel autorisé", "Réinitialisation obligatoire au retour", "Réparation non autorisée sans accord"],
+    directNumber: true,
   },
   {
     id: "4",
@@ -175,6 +179,7 @@ export const mockAds: Ad[] = [
     requirements: ["Pièce d'identité", "Adresse du chantier", "Caution matériel"],
     security: ["État des lieux", "Contrat de location", "Support propriétaire"],
     usageRules: ["Installation sur surface stable", "Carburant à la charge du locataire", "Retour avec niveau et accessoires conformes"],
+    directNumber: false,
   },
 ];
 

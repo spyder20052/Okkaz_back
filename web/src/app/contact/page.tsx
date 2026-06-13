@@ -49,7 +49,7 @@ export default function ContactPage() {
           <div className={styles.copy}>
             <h1 id="contact-title">Parlons de votre besoin.</h1>
             <p>
-              Location, LOA, publication ou support vendeur: laissez-nous les détails et nous vous
+              Location, Achat / Vente, publication ou support vendeur: laissez-nous les détails et nous vous
               orientons vers la bonne solution.
             </p>
           </div>

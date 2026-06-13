@@ -117,7 +117,7 @@ export default function AdDetailPage({ params }: { params: Promise<{ id: string 
                 aria-hidden
               />
             </span>
-            {ad.loaPossible && <span className={styles.loaBadge}>LOA dispo</span>}
+            {ad.loaPossible && <span className={styles.loaBadge}>Achat / Vente</span>}
           </div>
           <div className={styles.thumbs}>
             {gallery.map((src, i) => (
@@ -167,7 +167,7 @@ export default function AdDetailPage({ params }: { params: Promise<{ id: string 
             <p className={styles.optionLabel}>Durée</p>
             <div className={styles.optionBtns}>
               <button type="button" className={styles.optionBtnActive}>{ad.minimumDuration}</button>
-              {ad.loaPossible && <button type="button" className={styles.optionBtn}>LOA — {ad.loaDuration}</button>}
+              {ad.loaPossible && <button type="button" className={styles.optionBtn}>Achat / Vente — {ad.loaDuration}</button>}
               <button type="button" className={styles.optionBtn}>Sur mesure</button>
             </div>
           </div>
@@ -179,12 +179,33 @@ export default function AdDetailPage({ params }: { params: Promise<{ id: string 
             </div>
           </div>
 
+          <div className={styles.contactBlock}>
+            <p className={styles.contactPhoneLabel}>
+              {ad.directNumber ? "📞 Numéro direct du vendeur" : "📞 Numéro intermédiaire OKKAZ"}
+            </p>
+            <div className={styles.phoneBox}>
+              <strong>{ad.directNumber ? ad.ownerPhone : "+229 01 00 00 00 00"}</strong>
+            </div>
+          </div>
+
           <div className={styles.actions}>
-            <Link href={`/paiement?annonce=${ad.id}`} className={styles.btnPrimary}>Réserver maintenant</Link>
+            <a
+              href={`https://wa.me/${(ad.directNumber ? ad.ownerPhone : "+229 01 00 00 00 00").replace(/\D/g, "")}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={styles.btnPrimary}
+              style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", minHeight: "3.2rem", borderRadius: "12px", textDecoration: "none", fontWeight: 760 }}
+            >
+              Contacter sur WhatsApp
+            </a>
           </div>
 
           <p className={styles.lockedContact}>
-            Le numéro du vendeur est dévoilé uniquement après paiement validé par OKKAZ.
+            {ad.directNumber ? (
+              "Ce vendeur a payé l'option Premium pour afficher son numéro direct."
+            ) : (
+              "Numéro intermédiaire OKKAZ affiché. OKKAZ sécurise la mise en relation et la transaction."
+            )}
           </p>
 
           <div className={styles.verifiedRow}>
@@ -273,7 +294,7 @@ export default function AdDetailPage({ params }: { params: Promise<{ id: string 
                 <div className={styles.cardBody}>
                   <div className={styles.cardTop}>
                     <span>{a.category}</span>
-                    <span>{a.loaPossible ? "LOA dispo" : "Location"}</span>
+                    <span>{a.loaPossible ? "Achat / Vente" : "Location"}</span>
                   </div>
                   <h2>{a.title}</h2>
                   <strong className={styles.cardPrice}>{a.price.toLocaleString("fr-FR")} FCFA / mois</strong>

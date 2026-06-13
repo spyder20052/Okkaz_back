@@ -13,7 +13,7 @@ export default function AdminContratsPage() {
       <section className={styles.content}>
         <header className={styles.header}>
           <div>
-            <h1>Contrats LOA</h1>
+            <h1>Contrats Achat / Vente</h1>
             <p>Suivi des mensualites, signatures et levees d option d achat.</p>
           </div>
           <label className={styles.search}>
@@ -26,7 +26,7 @@ export default function AdminContratsPage() {
         <section className={styles.actionPageGrid}>
           <article className={styles.card}>
             <div className={styles.cardHeader}>
-              <h2>Dossiers LOA actifs</h2>
+              <h2>Dossiers Achat / Vente actifs</h2>
               <button type="button">Echeances</button>
             </div>
             <div className={styles.actionList}>
@@ -44,7 +44,7 @@ export default function AdminContratsPage() {
           </article>
 
           <aside className={styles.simulator}>
-            <h2>Simulation LOA</h2>
+            <h2>Simulation Achat / Vente</h2>
             <label>
               Prix du bien
               <input type="text" defaultValue="12 500 000 FCFA" />

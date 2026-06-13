@@ -27,19 +27,31 @@ function PaiementContent() {
   const isSubscription = paymentType === "abonnement";
   const isBoost = paymentType === "boost";
   const isSearchUrgency = paymentType === "recherche";
+  const isDirectNumber = paymentType === "direct_number";
   const subscriptionAmount = plan.includes("semaine") ? 3000 : plan.includes("beneficiaire") ? 1000 : 10000;
   const boostAmount = 5000;
   const searchAmount = searchParams.get("urgence") === "Express" ? 5000 : 2500;
-  const total = isSubscription ? subscriptionAmount : isBoost ? boostAmount : isSearchUrgency ? searchAmount : ad.price + ad.deposit;
-  const backHref = isSubscription || isBoost ? "/vendeur" : isSearchUrgency ? "/vendeur/recherches/nouvelle" : "/annonces";
-  const backLabel = isSubscription || isBoost ? "Retour au dashboard" : isSearchUrgency ? "Retour au formulaire" : "Retour aux annonces";
+  const directNumberAmount = 2500;
+  const total = isSubscription
+    ? subscriptionAmount
+    : isBoost
+    ? boostAmount
+    : isSearchUrgency
+    ? searchAmount
+    : isDirectNumber
+    ? directNumberAmount
+    : ad.price + ad.deposit;
+  const backHref = isSubscription || isBoost || isDirectNumber ? "/vendeur" : isSearchUrgency ? "/vendeur/recherches/nouvelle" : "/annonces";
+  const backLabel = isSubscription || isBoost || isDirectNumber ? "Retour au dashboard" : isSearchUrgency ? "Retour au formulaire" : "Retour aux annonces";
   const secureCopy = isSubscription
     ? "Paiement sécurisé par OKKAZ. L'abonnement est accordé depuis le back-office après validation."
     : isBoost
     ? "Paiement sécurisé par OKKAZ. Le boost est appliqué uniquement à cette annonce après validation admin."
     : isSearchUrgency
     ? "Paiement sécurisé par OKKAZ. La demande Express est publiée après confirmation."
-    : "Paiement sécurisé par OKKAZ. Le contact vendeur reste masqué avant validation.";
+    : isDirectNumber
+    ? "Paiement sécurisé par OKKAZ. L'affichage de votre numéro direct sera activé après confirmation."
+    : "Paiement sécurisé par OKKAZ. Votre réservation est enregistrée en toute sécurité.";
 
   const confirmPayment = () => {
     setIsPaid(true);
@@ -68,9 +80,19 @@ function PaiementContent() {
       });
       return;
     }
+    if (isDirectNumber) {
+      pushPlatformEvent({
+        type: "direct_number_payment",
+        title: "Option numéro direct payée",
+        detail: `${savedProfile.firstName} ${savedProfile.lastName} a payé l'option numéro direct pour ${ad.title}.`,
+        amount: total,
+        status: "done",
+      });
+      return;
+    }
     pushPlatformEvent({
-      type: isSubscription ? "subscription_payment" : "contact_reveal",
-      title: isSubscription ? `Paiement abonnement ${plan}` : "Numero vendeur devoile",
+      type: isSubscription ? "subscription_payment" : "booking_payment",
+      title: isSubscription ? `Paiement abonnement ${plan}` : "Réservation de bien confirmée",
       detail: isSubscription
         ? `${savedProfile.firstName} ${savedProfile.lastName} a paye ${plan}. Activation admin requise.`
         : `${savedProfile.firstName} ${savedProfile.lastName} a paye pour reserver ${ad.title}.`,
@@ -88,7 +110,7 @@ function PaiementContent() {
             <span aria-hidden>←</span>
             {backLabel}
           </Link>
-          <h1 className={styles.title}>{isSubscription ? "Payer un abonnement" : isBoost ? "Booster cette annonce" : isSearchUrgency ? "Payer l'urgence" : "Réserver ce bien"}</h1>
+          <h1 className={styles.title}>{isSubscription ? "Payer un abonnement" : isBoost ? "Booster cette annonce" : isSearchUrgency ? "Payer l'urgence" : isDirectNumber ? "Dévoiler son numéro (Vendeur)" : "Réserver ce bien"}</h1>
           <p className={styles.subtitle}>
             {isBoost
               ? "Le boost est attaché à cette annonce précise. Après paiement, l'admin reçoit la demande et active la mise en avant."
@@ -96,7 +118,9 @@ function PaiementContent() {
               ? "Le paiement Express publie votre demande Je recherche en priorité auprès des vendeurs concernés."
               : isSubscription
               ? "Après paiement, l'admin reçoit une notification et active votre offre premium."
-              : "Vos informations de profil sont déjà enregistrées. Après paiement, le numéro vendeur est dévoilé automatiquement."}
+              : isDirectNumber
+              ? "En tant que vendeur, payez cette option pour dévoiler directement votre numéro de téléphone sur l'annonce au lieu du numéro d'OKKAZ."
+              : "Vos informations de profil sont déjà enregistrées. Après paiement de la réservation, le vendeur sera averti."}
           </p>
 
           <form className={styles.form} onSubmit={(e) => { e.preventDefault(); confirmPayment(); }}>
@@ -119,7 +143,7 @@ function PaiementContent() {
               </div>
             </div>
 
-            {!isSubscription && !isBoost && !isSearchUrgency && (
+            {!isSubscription && !isBoost && !isSearchUrgency && !isDirectNumber && (
             <div className={styles.section}>
               <p className={styles.sectionLabel}>Durée de location</p>
               <div className={styles.durationBtns}>
@@ -150,14 +174,14 @@ function PaiementContent() {
             </div>
 
             <button type="submit" className={styles.submitBtn}>
-              {isPaid ? "Paiement confirmé" : isSubscription ? "Payer l'abonnement" : isBoost ? "Payer le boost" : isSearchUrgency ? "Payer et publier en Express" : "Payer et dévoiler le numéro"}
+              {isPaid ? "Paiement confirmé" : isSubscription ? "Payer l'abonnement" : isBoost ? "Payer le boost" : isSearchUrgency ? "Payer et publier en Express" : isDirectNumber ? "Payer et dévoiler son numéro" : "Réserver ce bien"}
             </button>
 
-            {isPaid && !isSubscription && !isBoost && !isSearchUrgency && (
+            {isPaid && !isSubscription && !isBoost && !isSearchUrgency && !isDirectNumber && (
               <div className={styles.revealBox}>
-                <span>Numéro vendeur dévoilé</span>
-                <strong>{ad.ownerPhone}</strong>
-                <p>Ce numéro est visible uniquement pour le compte qui vient de payer cette réservation.</p>
+                <span>Réservation confirmée !</span>
+                <strong>{ad.directNumber ? ad.ownerPhone : "+229 01 00 00 00 00"}</strong>
+                <p>Votre paiement a été validé. Vous pouvez contacter le vendeur ou notre équipe intermédiaire.</p>
                 <Link href="/chat" className={styles.chatLink}>Ouvrir le chat OKKAZ</Link>
               </div>
             )}
@@ -168,6 +192,15 @@ function PaiementContent() {
                 <strong>{ad.title}</strong>
                 <p>OKKAZ a reçu la demande. L&apos;annonce sera mise en avant après validation admin.</p>
                 <Link href="/vendeur" className={styles.chatLink}>Retour à mes annonces</Link>
+              </div>
+            )}
+
+            {isPaid && isDirectNumber && (
+              <div className={styles.revealBox}>
+                <span>Option activée !</span>
+                <strong>Numéro direct visible</strong>
+                <p>Votre numéro direct est maintenant visible de tous sur la page de l&apos;annonce.</p>
+                <Link href="/vendeur" className={styles.chatLink}>Retour à mon espace</Link>
               </div>
             )}
 
@@ -200,21 +233,21 @@ function PaiementContent() {
                 <Image src={ad.image} alt={ad.title} fill sizes="380px" />
               </div>
             )}
-            <p className={styles.summaryTitle}>{isSubscription ? "Abonnement compte" : isBoost ? `Boost · ${ad.title}` : isSearchUrgency ? "Publication Je recherche Express" : ad.title}</p>
-            <p className={styles.summaryOwner}>{isSubscription ? plan : isBoost ? `${ad.reference} · ${ad.location}` : isSearchUrgency ? "Alerte prioritaire vendeurs" : `${ad.owner} · ${ad.location}`}</p>
+            <p className={styles.summaryTitle}>{isSubscription ? "Abonnement compte" : isBoost ? `Boost · ${ad.title}` : isSearchUrgency ? "Publication Je recherche Express" : isDirectNumber ? `Dévoiler son numéro · ${ad.title}` : ad.title}</p>
+            <p className={styles.summaryOwner}>{isSubscription ? plan : isBoost || isDirectNumber ? `${ad.reference} · ${ad.location}` : isSearchUrgency ? "Alerte prioritaire vendeurs" : `${ad.owner} · ${ad.location}`}</p>
 
             <div className={styles.summaryLines}>
-              {!isSubscription && !isBoost && !isSearchUrgency && <div className={styles.summaryLine}>
+              {!isSubscription && !isBoost && !isSearchUrgency && !isDirectNumber && <div className={styles.summaryLine}>
                 <span>Loyer</span>
                 <strong>{ad.price.toLocaleString("fr-FR")} FCFA</strong>
               </div>}
-              {!isSubscription && !isBoost && !isSearchUrgency && <div className={styles.summaryLine}>
+              {!isSubscription && !isBoost && !isSearchUrgency && !isDirectNumber && <div className={styles.summaryLine}>
                 <span>Caution</span>
                 <strong>{ad.deposit.toLocaleString("fr-FR")} FCFA</strong>
               </div>}
               <div className={styles.summaryLine}>
-                <span>{isSubscription ? "Plan" : isBoost ? "Service" : isSearchUrgency ? "Service" : "Durée"}</span>
-                <strong>{isSubscription ? plan : isBoost ? "Boost annonce 7 jours" : isSearchUrgency ? "Je recherche Express" : ad.minimumDuration}</strong>
+                <span>{isSubscription ? "Plan" : isBoost ? "Service" : isSearchUrgency ? "Service" : isDirectNumber ? "Option" : "Durée"}</span>
+                <strong>{isSubscription ? plan : isBoost ? "Boost annonce 7 jours" : isSearchUrgency ? "Je recherche Express" : isDirectNumber ? "Dévoilement numéro vendeur" : ad.minimumDuration}</strong>
               </div>
             </div>
 

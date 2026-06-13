@@ -118,7 +118,7 @@ export default function OwnerSection() {
         >
           <span className={styles.ownerPill}>Gagner</span>
           <h3>Transformez vos actifs en revenus</h3>
-          <p>Location, LOA ou mise en avant Pro selon votre stratégie.</p>
+          <p>Location, Achat / Vente ou mise en avant Pro selon votre stratégie.</p>
         </Link>
       </div>
     </section>

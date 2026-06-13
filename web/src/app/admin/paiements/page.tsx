@@ -5,12 +5,11 @@ import Link from "next/link";
 import AdminShell from "../AdminShell";
 import styles from "../admin.module.css";
 
-type ServiceKey = "Mise en contact" | "Je recherche" | "Express" | "Abonnement";
+type ServiceKey = "Option Numéro Direct" | "Boost" | "Abonnement";
 
-const SERVICE_COLOR: Record<ServiceKey, "blue" | "green" | "orange" | "violet"> = {
-  "Mise en contact": "blue",
-  "Je recherche": "green",
-  "Express": "orange",
+const SERVICE_COLOR: Record<ServiceKey, "blue" | "orange" | "violet"> = {
+  "Option Numéro Direct": "blue",
+  "Boost": "orange",
   "Abonnement": "violet",
 };
 
@@ -26,23 +25,22 @@ type Transaction = {
 };
 
 const transactions: Transaction[] = [
-  { ref: "MIS-9981", service: "Mise en contact", user: "Yann A.", target: "Mercedes-Benz Classe G", method: "MTN MoMo", date: "23/05 14:32", amount: 1500, status: "Encaissé" },
-  { ref: "MIS-9978", service: "Mise en contact", user: "Carine T.", target: "iPhone 15 Pro Max", method: "Carte Visa", date: "23/05 12:08", amount: 1500, status: "Encaissé" },
-  { ref: "JR-204", service: "Je recherche", user: "Adrien K.", target: "Generatrice 5 kVA", method: "Moov Money", date: "23/05 11:22", amount: 2500, status: "Encaissé" },
-  { ref: "MIS-9974", service: "Mise en contact", user: "Saliou D.", target: "Studio Fidjrosse", method: "MTN MoMo", date: "23/05 09:47", amount: 1500, status: "Encaissé" },
+  { ref: "DIR-9981", service: "Option Numéro Direct", user: "Yann A.", target: "Mercedes-Benz Classe G", method: "MTN MoMo", date: "23/05 14:32", amount: 2500, status: "Encaissé" },
+  { ref: "DIR-9978", service: "Option Numéro Direct", user: "Carine T.", target: "iPhone 15 Pro Max", method: "Carte Visa", date: "23/05 12:08", amount: 2500, status: "Encaissé" },
+  { ref: "BST-204", service: "Boost", user: "Adrien K.", target: "Generatrice 5 kVA", method: "Moov Money", date: "23/05 11:22", amount: 5000, status: "Encaissé" },
+  { ref: "DIR-9974", service: "Option Numéro Direct", user: "Saliou D.", target: "Studio Fidjrosse", method: "MTN MoMo", date: "23/05 09:47", amount: 2500, status: "Encaissé" },
   { ref: "ABO-127", service: "Abonnement", user: "Immo Bénin", target: "Mensuel mai 2026", method: "Carte Visa", date: "22/05 18:12", amount: 10000, status: "Encaissé" },
-  { ref: "JRE-088", service: "Express", user: "Lara D.", target: "Bureau Akpakpa", method: "MTN MoMo", date: "22/05 16:40", amount: 5000, status: "Encaissé" },
-  { ref: "MIS-9962", service: "Mise en contact", user: "Patrice N.", target: "Camionnette 3T", method: "Moov Money", date: "22/05 11:03", amount: 1500, status: "En attente" },
-  { ref: "MIS-9951", service: "Mise en contact", user: "Mireille O.", target: "Climatiseur split", method: "Carte Visa", date: "21/05 13:18", amount: 1500, status: "Échec" },
+  { ref: "BST-088", service: "Boost", user: "Lara D.", target: "Bureau Akpakpa", method: "MTN MoMo", date: "22/05 16:40", amount: 5000, status: "Encaissé" },
+  { ref: "DIR-9962", service: "Option Numéro Direct", user: "Patrice N.", target: "Camionnette 3T", method: "Moov Money", date: "22/05 11:03", amount: 2500, status: "En attente" },
+  { ref: "DIR-9951", service: "Option Numéro Direct", user: "Mireille O.", target: "Climatiseur split", method: "Carte Visa", date: "21/05 13:18", amount: 2500, status: "Échec" },
 ];
 
-type Filter = "all" | "mise" | "recherche" | "express" | "abo";
+type Filter = "all" | "direct" | "boost" | "abo";
 
 const FILTER_LABEL: Record<Filter, string> = {
   all: "Toutes",
-  mise: "Mise en contact",
-  recherche: "Je recherche",
-  express: "Express",
+  direct: "Option Numéro Direct",
+  boost: "Boost",
   abo: "Abonnements",
 };
 
@@ -51,9 +49,8 @@ export default function AdminPaiementsPage() {
 
   const matched = (t: Transaction) => {
     if (filter === "all") return true;
-    if (filter === "mise") return t.service === "Mise en contact";
-    if (filter === "recherche") return t.service === "Je recherche";
-    if (filter === "express") return t.service === "Express";
+    if (filter === "direct") return t.service === "Option Numéro Direct";
+    if (filter === "boost") return t.service === "Boost";
     if (filter === "abo") return t.service === "Abonnement";
     return true;
   };
@@ -62,8 +59,8 @@ export default function AdminPaiementsPage() {
   const ok = transactions.filter((t) => t.status === "Encaissé");
   const totalRevenue = ok.reduce((s, t) => s + t.amount, 0);
   const counts = {
-    mise: ok.filter((t) => t.service === "Mise en contact").length,
-    rech: ok.filter((t) => t.service === "Je recherche").length + ok.filter((t) => t.service === "Express").length,
+    direct: ok.filter((t) => t.service === "Option Numéro Direct").length,
+    boost: ok.filter((t) => t.service === "Boost").length,
     abo: ok.filter((t) => t.service === "Abonnement").length,
   };
 
@@ -93,17 +90,17 @@ export default function AdminPaiementsPage() {
             <span className={`${styles.statTileIcon} ${styles.statTileIconBlue}`}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
             </span>
-            <small>CONTACTS</small>
-            <strong>{counts.mise}</strong>
-            <p>1 500 FCFA / acte</p>
+            <small>NUMÉRO DIRECT</small>
+            <strong>{counts.direct}</strong>
+            <p>2 500 FCFA / option</p>
           </div>
           <div className={styles.statTile}>
             <span className={`${styles.statTileIcon} ${styles.statTileIconOrange}`}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
             </span>
-            <small>JE RECHERCHE</small>
-            <strong>{counts.rech}</strong>
-            <p>standard + express</p>
+            <small>BOOSTS</small>
+            <strong>{counts.boost}</strong>
+            <p>5 000 FCFA / boost</p>
           </div>
           <div className={styles.statTile}>
             <span className={`${styles.statTileIcon} ${styles.statTileIconViolet}`}>

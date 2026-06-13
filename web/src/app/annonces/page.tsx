@@ -1,16 +1,15 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useHeroUnfold } from "@/hooks/useHeroUnfold";
-import { mockAds, type SearchRequest } from "@/lib/data";
-import { readSearchRequests } from "@/lib/searchRequests";
+import { mockAds } from "@/lib/data";
 import styles from "./annonces.module.css";
 
-const MODES = ["Tous", "LOA", "Location"] as const;
-const CATEGORY_ORDER = ["Toutes", "Véhicules", "Immobilier", "Électronique", "Équipements Pro", "Je recherche", "Événementiel", "Mobilier"];
+const MODES = ["Tous", "Achat / Vente", "Location"] as const;
+const CATEGORY_ORDER = ["Toutes", "Véhicules", "Immobilier", "Électronique", "Équipements Pro", "Événementiel", "Mobilier"];
 const HERO_LETTERS = ["b", "i", "e", "n", "s"];
 
 function AnnoncesContent() {
@@ -19,24 +18,10 @@ function AnnoncesContent() {
   const [searchTerm, setSearchTerm] = useState("");
   const [category, setCategory] = useState(searchParams.get("category") ?? "Toutes");
   const [mode, setMode] = useState<(typeof MODES)[number]>("Tous");
-  const [searchRequests, setSearchRequests] = useState<SearchRequest[]>([]);
 
   const categories = useMemo(() => {
     const existing = new Set(mockAds.map((ad) => ad.category));
-    return CATEGORY_ORDER.filter((item) => item === "Toutes" || item === "Je recherche" || existing.has(item));
-  }, []);
-
-  useEffect(() => {
-    const syncRequests = () => setSearchRequests(readSearchRequests());
-
-    syncRequests();
-    window.addEventListener("okkaz-search-requests-updated", syncRequests);
-    window.addEventListener("storage", syncRequests);
-
-    return () => {
-      window.removeEventListener("okkaz-search-requests-updated", syncRequests);
-      window.removeEventListener("storage", syncRequests);
-    };
+    return CATEGORY_ORDER.filter((item) => item === "Toutes" || existing.has(item));
   }, []);
 
   const filteredAds = mockAds.filter((ad) => {
@@ -47,22 +32,11 @@ function AnnoncesContent() {
       ad.location.toLowerCase().includes(query) ||
       ad.owner.toLowerCase().includes(query);
     const matchesCategory = category === "Toutes" || ad.category === category;
-    const matchesMode = mode === "Tous" || (mode === "LOA" ? ad.loaPossible : !ad.loaPossible);
+    const matchesMode = mode === "Tous" || (mode === "Achat / Vente" ? ad.loaPossible : !ad.loaPossible);
 
     return matchesSearch && matchesCategory && matchesMode;
   });
-  const filteredRequests = searchRequests.filter((request) => {
-    const query = searchTerm.trim().toLowerCase();
-    const matchesSearch =
-      query.length === 0 ||
-      request.title.toLowerCase().includes(query) ||
-      request.location.toLowerCase().includes(query) ||
-      request.requester.toLowerCase().includes(query);
-    const matchesCategory = category === "Je recherche" || request.category === category;
 
-    return matchesSearch && matchesCategory && mode === "Tous";
-  });
-  const visibleRequests = category === "Je recherche" ? filteredRequests : [];
   const heroCenter = (HERO_LETTERS.length - 1) / 2;
 
   return (
@@ -138,30 +112,11 @@ function AnnoncesContent() {
         </div>
 
         <div className={styles.resultsHeader}>
-          <span>{filteredAds.length + visibleRequests.length} résultat{filteredAds.length + visibleRequests.length > 1 ? "s" : ""}</span>
+          <span>{filteredAds.length} résultat{filteredAds.length > 1 ? "s" : ""}</span>
           <span>Bénin</span>
         </div>
 
         <div className={styles.grid}>
-          {visibleRequests.map((request) => (
-            <article key={request.id} className={`${styles.card} ${styles.requestCard}`}>
-              <div className={styles.requestCardBody}>
-                <div className={styles.cardTop}>
-                  <span>Je recherche</span>
-                  <span>{request.urgency}</span>
-                </div>
-                <h2>{request.title}</h2>
-                <p>{request.description}</p>
-                <strong className={styles.price}>Budget {request.budget.toLocaleString("fr-FR")} FCFA</strong>
-                <span className={styles.requestMeta}>{request.category} · {request.location}</span>
-                <span className={styles.requestMeta}>{request.requester} · {request.createdAt}</span>
-                <Link href={`/vendeur?recherche=${request.id}`} className={styles.requestCta}>
-                  Je peux répondre
-                </Link>
-              </div>
-            </article>
-          ))}
-
           {filteredAds.map((ad, index) => (
             <Link
               key={ad.id}
@@ -174,7 +129,7 @@ function AnnoncesContent() {
               <div className={styles.cardBody}>
                 <div className={styles.cardTop}>
                   <span>{ad.category}</span>
-                  <span>{ad.loaPossible ? "LOA dispo" : "Location"}</span>
+                  <span>{ad.loaPossible ? "Achat / Vente" : "Location"}</span>
                 </div>
                 <h2>{ad.title}</h2>
                 <strong className={styles.price}>{ad.price.toLocaleString("fr-FR")} FCFA / mois</strong>

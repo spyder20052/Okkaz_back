@@ -882,3 +882,35 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+.contactBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.85rem 1rem;
+  background: #f7f8f8;
+  border-radius: 12px;
+  margin-top: 0.5rem;
+}
+
+.contactPhoneLabel {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 820;
+  color: rgba(17, 17, 17, 0.45);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.phoneBox {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.phoneBox strong {
+  font-size: 1.2rem;
+  font-weight: 860;
+  color: #111111;
+  letter-spacing: -0.02em;
+}

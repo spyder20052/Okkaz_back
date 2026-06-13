@@ -10,52 +10,27 @@ import styles from "./AwsmdInspiredSection.module.css";
 
 gsap.registerPlugin(ScrollTrigger);
 
-const LISTINGS = [
-  {
-    href: "/annonces/1",
-    category: "Véhicule",
-    terms: "LOA dispo",
-    title: "Toyota RAV4 2021",
-    seller: "AutoPlus Cotonou",
-    location: "Cotonou, Akpakpa",
-    price: "85 000 FCFA / mois",
-    image: "/vehicules.png",
-    tone: styles.lime,
-  },
-  {
-    href: "/annonces/2",
-    category: "Immobilier",
-    terms: "Location",
-    title: "Studio meublé",
-    seller: "Immo Fidjrossè",
-    location: "Cotonou, Fidjrossè",
-    price: "180 000 FCFA / mois",
-    image: "/hero.PNG",
-    tone: styles.soft,
-  },
-  {
-    href: "/annonces/4",
-    category: "Pro",
-    terms: "Caution requise",
-    title: "Groupe électrogène",
-    seller: "BTP Services",
-    location: "Abomey-Calavi",
-    price: "25 000 FCFA / jour",
-    image: "/equipements-pro.png",
-    tone: styles.mint,
-  },
-  {
-    href: "/annonces/3",
-    category: "Tech",
-    terms: "Achat progressif",
-    title: "iPhone 14 Pro",
-    seller: "Kouassi Digital",
-    location: "Porto-Novo",
-    price: "45 000 FCFA / mois",
-    image: "/electronique.png",
-    tone: styles.blue,
-  },
-];
+import { mockAds } from "@/lib/data";
+
+const TONES = [styles.lime, styles.soft, styles.mint, styles.blue];
+
+const LISTINGS = mockAds.map((ad, index) => {
+  const tone = TONES[index % TONES.length];
+  const terms = ad.loaPossible ? "Achat / Vente" : "Location";
+  const durationLabel = ad.id === "4" ? "jour" : "mois";
+
+  return {
+    href: `/annonces/${ad.id}`,
+    category: ad.category,
+    terms,
+    title: ad.title,
+    seller: ad.owner,
+    location: ad.location,
+    price: `${ad.price.toLocaleString("fr-FR")} FCFA / ${durationLabel}`,
+    image: ad.image,
+    tone,
+  };
+});
 
 export default function AwsmdInspiredSection() {
   const sectionRef = useRef<HTMLElement>(null);
@@ -149,20 +124,6 @@ export default function AwsmdInspiredSection() {
     return () => mm.revert();
   }, { scope: sectionRef });
 
-  const scrollCards = (direction: "prev" | "next") => {
-    const container = cardsRef.current;
-
-    if (!container) return;
-
-    const firstCard = container.querySelector("a");
-    const cardWidth = firstCard?.clientWidth ?? 320;
-    const gap = 24;
-
-    container.scrollBy({
-      left: direction === "next" ? cardWidth + gap : -(cardWidth + gap),
-      behavior: "smooth",
-    });
-  };
 
   return (
     <section className={styles.shell} ref={sectionRef}>
@@ -179,14 +140,9 @@ export default function AwsmdInspiredSection() {
               </span>
             </h2>
           </div>
-          <div className={styles.arrows}>
-            <button type="button" onClick={() => scrollCards("prev")} aria-label="Voir les annonces précédentes">
-              ‹
-            </button>
-            <button type="button" onClick={() => scrollCards("next")} aria-label="Voir les annonces suivantes">
-              ›
-            </button>
-          </div>
+          <Link href="/annonces" className={styles.seeMoreLink}>
+            Voir plus →
+          </Link>
         </div>
 
         <div className={styles.cards} ref={cardsRef} aria-label="Publications des vendeurs OKKAZ">
@@ -197,15 +153,6 @@ export default function AwsmdInspiredSection() {
               key={listing.title}
               ref={(el) => { listingRefs.current[index] = el; }}
             >
-              <div className={styles.cardTop}>
-                <span>{listing.category}</span>
-                <span>{listing.terms}</span>
-                <i aria-hidden />
-              </div>
-              <h3>{listing.title}</h3>
-              <p className={styles.seller}>{listing.seller}</p>
-              <p className={styles.meta}>{listing.location}</p>
-              <strong className={styles.price}>{listing.price}</strong>
               <div className={styles.imageWrap}>
                 <Image
                   src={listing.image}
@@ -213,7 +160,16 @@ export default function AwsmdInspiredSection() {
                   fill
                   sizes="(max-width: 900px) 76vw, 23vw"
                 />
-                <span className={styles.readMore}>Voir l&apos;annonce →</span>
+              </div>
+              <div className={styles.cardBody}>
+                <div className={styles.cardTop}>
+                  <span>{listing.category}</span>
+                  <span>{listing.terms}</span>
+                </div>
+                <h3>{listing.title}</h3>
+                <p className={styles.seller}>{listing.seller}</p>
+                <p className={styles.meta}>{listing.location}</p>
+                <strong className={styles.price}>{listing.price}</strong>
               </div>
             </Link>
           ))}

@@ -1,8 +1,9 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { Suspense, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { mockAds, type Ad } from "@/lib/data";
 import SellerShell from "./SellerShell";
 import styles from "./vendeur.module.css";
@@ -16,7 +17,9 @@ const INITIAL_ADS: AdItem[] = mockAds.slice(0, 4).map((ad, i) => ({
   reveals: [3, 1, 0, 2][i] ?? 0,
 }));
 
-export default function UserSpacePage() {
+function UserSpaceContent() {
+  const searchParams = useSearchParams();
+  const isPublished = searchParams.get("publie") === "success";
   const [tab, setTab] = useState<Tab>("overview");
   const [name, setName] = useState("Emma TODEDJI");
   const [email, setEmail] = useState("todedjiemma9@gmail.com");
@@ -63,6 +66,12 @@ export default function UserSpacePage() {
   return (
     <SellerShell active="/vendeur">
       <section className={styles.spaceContent}>
+        {isPublished && (
+          <div style={{ background: "var(--green-soft)", color: "var(--green)", padding: "16px 20px", borderRadius: "18px", fontWeight: 700, display: "flex", alignItems: "center", gap: "10px", boxShadow: "0 6px 18px rgba(22, 163, 74, 0.08)" }}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            Annonce publiée avec succès !
+          </div>
+        )}
         <div className={styles.spaceTopRow}>
           <header className={styles.spaceHeader}>
             <h1>Mon Espace</h1>
@@ -137,8 +146,8 @@ export default function UserSpacePage() {
                   </svg>
                 </span>
                 <small>ALERTES</small>
-                <strong>2</strong>
-                <p>notifications à lire</p>
+                <strong>0</strong>
+                <p>aucune alerte</p>
               </article>
 
               <article className={styles.statTile}>
@@ -237,26 +246,7 @@ export default function UserSpacePage() {
                   </ul>
                 )}
 
-                <h2 className={styles.spaceSectionTitle}>
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
-                  </svg>
-                  Notifications
-                </h2>
-                <article className={styles.notificationCard}>
-                  <span className={styles.notificationIcon} aria-hidden>
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-                      <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-                    </svg>
-                  </span>
-                  <div>
-                    <strong>Nouvelles demandes clients</strong>
-                    <p>Consulte les besoins publiés par les clients et réponds uniquement aux demandes qui correspondent à tes biens.</p>
-                  </div>
-                  <Link href="/annonces?category=Je recherche">
-                    Voir les demandes
-                  </Link>
-                </article>
+
               </div>
             </div>
           </>
@@ -507,5 +497,13 @@ export default function UserSpacePage() {
         )}
       </section>
     </SellerShell>
+  );
+}
+
+export default function UserSpacePage() {
+  return (
+    <Suspense fallback={<div>Chargement de l&apos;espace vendeur...</div>}>
+      <UserSpaceContent />
+    </Suspense>
   );
 }

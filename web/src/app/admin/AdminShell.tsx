@@ -13,7 +13,6 @@ type AdminShellProps = {
 const menuItems = [
   { href: "/admin", label: "Dashboard", icon: "D" },
   { href: "/admin/annonces", label: "Annonces", icon: "A", badge: "8" },
-  { href: "/admin/demandes", label: "Demandes", icon: "R", badge: "5" },
   { href: "/admin/kyc", label: "Vérifications", icon: "V", badge: "2" },
   { href: "/admin/utilisateurs", label: "Utilisateurs", icon: "U" },
   { href: "/admin/abonnements", label: "Abonnements", icon: "B" },

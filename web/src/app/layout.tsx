@@ -5,8 +5,8 @@ import ConditionalFooter from "@/components/layout/ConditionalFooter";
 
 
 export const metadata: Metadata = {
-  title: "OKKAZ - Location & LOA au Bénin",
-  description: "Accédez aux biens et équipements essentiels via la location avec option d'achat. Simple, sécurisé et inclusif.",
+  title: "OKKAZ - Location & Achat / Vente au Bénin",
+  description: "Accédez aux biens et équipements essentiels via la location, l'achat ou la vente. Simple, sécurisé et inclusif.",
   icons: {
     icon: "/favicon.png",
   },

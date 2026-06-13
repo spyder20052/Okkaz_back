@@ -14,7 +14,7 @@ export default function Home() {
 
       {/* Mission Section */}
       <section className={styles.missionSection}>
-        <h3 className={styles.sectionSubtitle}>Location. Troc. LOA.</h3>
+        <h3 className={styles.sectionSubtitle}>Location. Troc. Achat / Vente.</h3>
         <MissionText />
       </section>
 

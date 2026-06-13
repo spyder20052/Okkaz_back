@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useRef, useState } from "react";
+import { Suspense, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { mockAds } from "@/lib/data";
@@ -13,7 +13,7 @@ const MAX_PHOTOS = 4;
 const CATEGORIES = ["Vehicules", "Immobilier", "Electronique", "Equipements Pro", "Evenementiel", "Mobilier"];
 const MODES = [
   { value: "location", label: "Location simple" },
-  { value: "loa", label: "Location avec option d'achat" },
+  { value: "loa", label: "Achat / Vente" },
   { value: "vente", label: "Vente" },
   { value: "troc", label: "Troc" },
 ];
@@ -26,34 +26,40 @@ function PublishForm() {
   const isEditing = !!editingAd;
 
   const [step, setStep] = useState(1);
-  const [photos, setPhotos] = useState<string[]>([]);
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [category, setCategory] = useState("");
-  const [mode, setMode] = useState("location");
-  const [price, setPrice] = useState("");
-  const [etat, setEtat] = useState("");
-  const [city, setCity] = useState("");
-  const [neighborhood, setNeighborhood] = useState("");
+  const [photos, setPhotos] = useState<string[]>(editingAd ? [editingAd.image] : []);
+  const [title, setTitle] = useState(editingAd?.title ?? "");
+  const [description, setDescription] = useState(editingAd?.description ?? "");
+  const [category, setCategory] = useState(editingAd?.category ?? "");
+  const [mode, setMode] = useState(editingAd ? (editingAd.loaPossible ? "loa" : "location") : "location");
+  const [price, setPrice] = useState(editingAd ? String(editingAd.price) : "");
+  const [etat, setEtat] = useState(() => {
+    if (!editingAd) return "";
+    const matchedEtat = ETATS.find((e) => e.toLowerCase() === editingAd.condition.toLowerCase());
+    return matchedEtat ?? "Bon etat";
+  });
+  const [city, setCity] = useState(() => {
+    if (!editingAd) return "";
+    const [cityPart] = editingAd.location.split(",").map((s) => s.trim());
+    return cityPart ?? "";
+  });
+  const [neighborhood, setNeighborhood] = useState(() => {
+    if (!editingAd) return "";
+    const [, neighborhoodPart] = editingAd.location.split(",").map((s) => s.trim());
+    return neighborhoodPart ?? "";
+  });
   const [validationOkkaz, setValidationOkkaz] = useState(true);
+  const [directNumber, setDirectNumber] = useState(editingAd?.directNumber ?? false);
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  // Pre-fill quand on edite une annonce
-  useEffect(() => {
-    if (!editingAd) return;
-    setTitle(editingAd.title);
-    setDescription(editingAd.description);
-    setCategory(editingAd.category);
-    setMode(editingAd.loaPossible ? "loa" : "location");
-    setPrice(String(editingAd.price));
-    const matchedEtat = ETATS.find((e) => e.toLowerCase() === editingAd.condition.toLowerCase());
-    setEtat(matchedEtat ?? "Bon etat");
-    const [cityPart, neighborhoodPart] = editingAd.location.split(",").map((s) => s.trim());
-    setCity(cityPart ?? "");
-    setNeighborhood(neighborhoodPart ?? "");
-    setPhotos([editingAd.image]);
-  }, [editingAd]);
+  const submit = () => {
+    if (directNumber) {
+      const adId = editingAd?.id ?? "1";
+      window.location.href = `/paiement?type=direct_number&annonce=${adId}`;
+    } else {
+      window.location.href = "/vendeur?publie=success";
+    }
+  };
 
   const addPhotos = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -335,6 +341,21 @@ function PublishForm() {
               </div>
             </label>
 
+            <label className={styles.wizardToggleRow}>
+              <span className={styles.wizardToggleSwitch}>
+                <input
+                  type="checkbox"
+                  checked={directNumber}
+                  onChange={(e) => setDirectNumber(e.target.checked)}
+                />
+                <span />
+              </span>
+              <div>
+                <strong>Option Numéro Direct (+2 500 FCFA)</strong>
+                <small>{"Affiche ton numéro direct sur l'annonce. Sans cette option, c'est le numéro d'OKKAZ qui sera affiché."}</small>
+              </div>
+            </label>
+
             <article className={styles.wizardRecap}>
               <h3>Récapitulatif</h3>
               <dl>
@@ -344,6 +365,7 @@ function PublishForm() {
                 <div><dt>Mode</dt><dd>{MODES.find((m) => m.value === mode)?.label}</dd></div>
                 <div><dt>Prix</dt><dd>{price ? `${price} FCFA` : "—"}</dd></div>
                 <div><dt>État</dt><dd>{etat || "—"}</dd></div>
+                <div><dt>Numéro direct</dt><dd>{directNumber ? "Oui (+2 500 FCFA)" : "Non (Numéro OKKAZ)"}</dd></div>
               </dl>
             </article>
           </div>
@@ -368,7 +390,7 @@ function PublishForm() {
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
             </button>
           ) : (
-            <button type="button" className={styles.wizardNextBtn}>
+            <button type="button" onClick={submit} className={styles.wizardNextBtn}>
               {isEditing ? "Mettre à jour" : "Publier"}
             </button>
           )}

@@ -73,7 +73,6 @@ export default function Footer() {
             <h4 className={styles.linksTitle}>Liens utiles</h4>
             <Link href="/" className={styles.linkItem}>Accueil</Link>
             <Link href="/annonces" className={styles.linkItem}>Biens disponibles</Link>
-            <Link href="/annonces?category=Je recherche" className={styles.linkItem}>Je recherche</Link>
             <Link href="/vendeur/publier" className={styles.linkItem}>Publier un bien</Link>
             <Link href="/vendeur" className={styles.linkItem}>Espace vendeur</Link>
             <Link href="/contact" className={styles.linkItem}>Contact</Link>

@@ -78,7 +78,7 @@ export default function FooterMotionPath() {
             <span className={styles.staticTitleText}>Du bien disponible</span>
             <span className={styles.movingTitleLine}>
               <span className={styles.movingTitleText} ref={titleMovingRef}>
-                à la location, l&apos;échange ou la LOA.
+                à la location, l&apos;échange ou l&apos;achat / vente.
               </span>
             </span>
           </h2>

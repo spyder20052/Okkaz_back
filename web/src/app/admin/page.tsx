@@ -38,8 +38,7 @@ export default function AdminDashboard() {
   const [tab, setTab] = useState<Tab>("overview");
   const [categories, setCategories] = useState<string[]>(INITIAL_CATEGORIES);
   const [newCategory, setNewCategory] = useState("");
-  const [contactPrice, setContactPrice] = useState("1500");
-  const [accessDuration, setAccessDuration] = useState("7");
+  const [contactPrice, setContactPrice] = useState("2500");
   const [adminName, setAdminName] = useState("Admin OKKAZ");
   const [adminEmail, setAdminEmail] = useState("admin@okkaz.bj");
   const [events, setEvents] = useState<PlatformEvent[]>([]);
@@ -76,7 +75,7 @@ export default function AdminDashboard() {
         <header className={styles.header}>
           <div>
             <h1>Dashboard admin</h1>
-            <p>Vue operationnelle OKKAZ : annonces, identites, paiements, abonnements et demandes clients.</p>
+            <p>Vue operationnelle OKKAZ : annonces, identites, paiements et abonnements.</p>
           </div>
 
           <label className={styles.search}>
@@ -224,18 +223,14 @@ export default function AdminDashboard() {
           <>
             <div className={styles.settingsGrid}>
               <article className={styles.adminSettingCard}>
-                <h2 className={styles.spaceSectionTitle}>Tarification mise en contact</h2>
+                <h2 className={styles.spaceSectionTitle}>Tarification Option Numéro Direct</h2>
                 <p className={styles.adminSettingLead}>
-                  Montant paye par le client pour debloquer un numero vendeur. Cet argent est encaisse par OKKAZ.
+                  Montant payé par le vendeur pour afficher directement son numéro sur l&apos;annonce. Cet argent est encaissé par OKKAZ.
                 </p>
                 <div className={styles.adminSettingRow}>
                   <label className={styles.adminSettingField}>
                     <span>Prix (FCFA)</span>
                     <input type="number" value={contactPrice} onChange={(e) => setContactPrice(e.target.value)} />
-                  </label>
-                  <label className={styles.adminSettingField}>
-                    <span>Duree d&apos;acces au numero (jours)</span>
-                    <input type="number" value={accessDuration} onChange={(e) => setAccessDuration(e.target.value)} />
                   </label>
                 </div>
               </article>
