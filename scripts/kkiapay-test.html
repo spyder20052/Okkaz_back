@@ -1,0 +1,55 @@
+<!doctype html>
+<!--
+  Page de test du widget KKiapay (SANDBOX).
+  Usage :
+   1. Appelle POST /payments/initiate-contact-access → récupère { providerRef, amount } et la clé publique.
+   2. Ouvre ce fichier dans le navigateur (double-clic suffit).
+   3. Colle la clé publique, le montant et le providerRef, puis "Payer".
+   4. En sandbox, KKiapay propose un numéro/carte de test pour simuler le paiement.
+
+  IMPORTANT : le `data` est renvoyé tel quel par KKiapay dans le webhook (champ stateData).
+  Le backend y lit { providerRef } pour retrouver le Payment.
+-->
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <title>OKKAZ — Test paiement KKiapay (sandbox)</title>
+    <script src="https://cdn.kkiapay.me/k.js"></script>
+    <style>
+      body { font-family: system-ui, sans-serif; max-width: 520px; margin: 40px auto; padding: 0 16px; }
+      label { display: block; margin: 12px 0 4px; font-weight: 600; }
+      input { width: 100%; padding: 8px; box-sizing: border-box; }
+      button { margin-top: 20px; padding: 12px 20px; background: #e94560; color: #fff; border: 0; border-radius: 6px; font-size: 16px; cursor: pointer; }
+    </style>
+  </head>
+  <body>
+    <h1>Test paiement KKiapay (sandbox)</h1>
+    <label>Clé publique KKiapay (KKIAPAY_PUBLIC_KEY)</label>
+    <input id="key" placeholder="ex: 1a2b3c..." />
+    <label>Montant (FCFA)</label>
+    <input id="amount" type="number" value="2500" />
+    <label>providerRef (renvoyé par /initiate-contact-access)</label>
+    <input id="ref" placeholder="ex: ca_xxxxxxxx-..." />
+
+    <button onclick="pay()">Payer (sandbox)</button>
+
+    <script>
+      function pay() {
+        const key = document.getElementById('key').value.trim();
+        const amount = Number(document.getElementById('amount').value);
+        const ref = document.getElementById('ref').value.trim();
+        openKkiapayWidget({
+          amount,
+          key,
+          sandbox: true,
+          data: JSON.stringify({ providerRef: ref }), // → revient dans le webhook (stateData)
+        });
+      }
+      addKkiapayListener('success', (resp) => {
+        alert('Paiement sandbox OK. KKiapay va appeler ton webhook.\nTransaction: ' + resp.transactionId);
+        console.log('success', resp);
+      });
+      addKkiapayListener('failed', (e) => console.log('failed', e));
+    </script>
+  </body>
+</html>
