@@ -90,7 +90,6 @@ enum SubscriptionStatus {
 }
 
 enum PaymentType {
-  CONTACT_ACCESS
   SUBSCRIPTION
   DEMAND_LISTING
   EXPRESS_DEMAND
@@ -167,7 +166,7 @@ model User {
   listings                 Listing[]          @relation("ListingOwner")
   validatedListings        Listing[]          @relation("ListingValidator")
   subscriptions            Subscription[]
-  contactAccesses          ContactAccess[]
+  contactReveals           ContactReveal[]
   payments                 Payment[]
   reportsMade              Report[]           @relation("ReportAuthor")
   reportsReceived          Report[]           @relation("ReportedUser")
@@ -267,7 +266,7 @@ model Listing {
   validator         User?             @relation("ListingValidator", fields: [validatedBy], references: [id])
   category          Category          @relation(fields: [categoryId], references: [id])
   photos            ListingPhoto[]
-  contactAccesses   ContactAccess[]
+  contactReveals    ContactReveal[]
   reports           Report[]
   reviews           Review[]
 
@@ -318,28 +317,25 @@ model Subscription {
   @@map("subscriptions")
 }
 
-/// §3.7 — Accès payants aux contacts.
-/// Contrainte : pas de doublon tant qu'un accès est actif (expiré = renouvelable).
-model ContactAccess {
-  id                     String    @id @default(uuid()) @db.Uuid
-  userId                 String    @map("user_id") @db.Uuid
-  listingId              String    @map("listing_id") @db.Uuid
-  paymentId              String    @unique @map("payment_id") @db.Uuid
-  contactPhoneRevealed   String    @map("contact_phone_revealed") @db.VarChar(500) // chiffré
-  amountPaid             Decimal   @map("amount_paid") @db.Decimal(12, 2)
-  expiresAt              DateTime  @map("expires_at") @db.Timestamptz(6)
-  isActive               Boolean   @default(true) @map("is_active")
-  createdAt              DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+/// §3.7 — Consultations (gratuites) des coordonnées d'une annonce.
+/// Trace l'interaction d'un locataire avec un contact (aucun paiement associé).
+/// Conditionne la possibilité de laisser un avis (cf. §4.9).
+/// Une seule entrée par couple (utilisateur, annonce).
+model ContactReveal {
+  id                    String    @id @default(uuid()) @db.Uuid
+  userId                String    @map("user_id") @db.Uuid
+  listingId             String    @map("listing_id") @db.Uuid
+  reviewReminderSentAt  DateTime? @map("review_reminder_sent_at") @db.Timestamptz(6)
+  createdAt             DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  user                   User      @relation(fields: [userId], references: [id])
-  listing                Listing   @relation(fields: [listingId], references: [id])
-  payment                Payment   @relation(fields: [paymentId], references: [id])
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  listing    Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
 
+  @@unique([userId, listingId])
   @@index([userId])
   @@index([listingId])
-  @@index([expiresAt])
-  @@index([isActive])
-  @@map("contact_accesses")
+  @@index([reviewReminderSentAt])
+  @@map("contact_reveals")
 }
 
 /// §3.8 — Paiements unifiés (accès contact, abonnement, demandes).
@@ -358,7 +354,6 @@ model Payment {
   updatedAt     DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   user          User           @relation(fields: [userId], references: [id])
-  contactAccess ContactAccess?
   subscription  Subscription?
   demandListing DemandListing?
 

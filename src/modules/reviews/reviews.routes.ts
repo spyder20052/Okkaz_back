@@ -22,6 +22,14 @@ router.get(
   asyncHandler(controller.forListing),
 );
 
+router.patch(
+  '/:id/moderate',
+  authenticate,
+  authorize('ADMIN'),
+  validateRequest({ params: schemas.reviewIdParamSchema, body: schemas.moderateReviewSchema }),
+  asyncHandler(controller.moderate),
+);
+
 router.delete(
   '/:id',
   authenticate,

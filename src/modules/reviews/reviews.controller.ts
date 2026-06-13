@@ -30,6 +30,17 @@ export async function forListing(req: Request, res: Response): Promise<Response>
 }
 
 /**
+ * `PATCH /reviews/:id/moderate` — Modère un avis (admin) : le masque/réaffiche.
+ *
+ * @param req - Param `:id` (UUID). Body : `{ isModerated: boolean }`.
+ * @param res - 200 OK avec `{ review }`.
+ */
+export async function moderate(req: Request, res: Response): Promise<Response> {
+  const review = await service.setModeration(req.params.id!, req.body.isModerated);
+  return sendSuccess(res, { review }, req.body.isModerated ? 'Avis masqué.' : 'Avis ré-affiché.');
+}
+
+/**
  * `DELETE /reviews/:id` — Supprime un avis (admin).
  *
  * @param req - Param `:id` (UUID).

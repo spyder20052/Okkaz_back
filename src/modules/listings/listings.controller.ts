@@ -41,6 +41,20 @@ export async function detail(req: Request, res: Response): Promise<Response> {
 }
 
 /**
+ * `POST /listings/:id/contact` — Consulte (gratuitement) le contact d'une annonce.
+ *
+ * Enregistre la consultation et renvoie le numéro réel de l'annonceur s'il est
+ * abonné, sinon le numéro intermédiaire de la plateforme.
+ *
+ * @param req - Param `:id` (UUID). Requiert `req.user` (BUYER).
+ * @param res - 200 OK avec `{ contactPhone, isOwnerNumber, watermark }`.
+ */
+export async function revealContact(req: Request, res: Response): Promise<Response> {
+  const data = await service.revealContact(req.user!.id, req.params.id!);
+  return sendSuccess(res, data);
+}
+
+/**
  * `POST /listings` — Crée une annonce (SELLER/SELLER_PRO, KYC requis).
  *
  * @param req - Body validé par `createListingSchema`. Requiert `req.user`.

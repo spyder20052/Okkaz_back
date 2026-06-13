@@ -79,14 +79,16 @@ const CATEGORIES: Array<{
 
 const SETTINGS: Array<{ key: string; value: string; description: string }> = [
   {
-    key: "contact_access_price",
-    value: "2500",
-    description: "Prix d'accès aux contacts (FCFA)",
+    key: "review_min_delay_hours",
+    value: "24",
+    description:
+      "Délai minimal (heures) entre la consultation du contact et le dépôt d'un avis",
   },
   {
-    key: "contact_access_duration_hours",
+    key: "review_reminder_delay_hours",
     value: "48",
-    description: "Durée d'accès au contact en heures",
+    description:
+      "Délai (heures) après la consultation avant l'envoi du rappel d'avis par email",
   },
   {
     key: "max_reports_before_suspend",

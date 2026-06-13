@@ -1,31 +1,26 @@
 /**
  * @module modules/payments/payments.service
- * @description Paiements & accès contacts (§4.6, §5.3, §5.4, §6.3).
+ * @description Paiements (§4.6).
  *
- *   Flux initiate-contact-access :
- *     1. Vérifie qu'aucun accès actif n'existe déjà.
- *     2. Crée un Payment PENDING (2 500 FCFA par défaut).
- *     3. Retourne une référence à utiliser côté frontend avec le SDK KKiapay.
+ *   Le client (locataire) ne paie plus pour consulter un contact : la
+ *   consultation est gratuite et tracée (cf. listings.revealContact /
+ *   ContactReveal). Les paiements restants concernent :
+ *     - SUBSCRIPTION       → abonnement annonceur (débloque l'affichage du
+ *                            numéro réel sur ses annonces).
+ *     - DEMAND_LISTING     → annonce « Je recherche » (standard).
+ *     - EXPRESS_DEMAND     → annonce « Je recherche » express.
  *
  *   Flux webhook :
  *     1. Secret `x-kkiapay-secret` vérifié en amont (middleware).
  *     2. Marque le Payment SUCCESS/FAILED.
- *     3. Si SUCCESS et type=CONTACT_ACCESS → crée un ContactAccess chiffré.
- *     4. Si SUCCESS et type=SUBSCRIPTION → active l'abonnement et passe le
+ *     3. Si SUCCESS et type=SUBSCRIPTION → active l'abonnement et passe le
  *        rôle à SELLER_PRO.
- *     5. Si SUCCESS et type=DEMAND_LISTING/EXPRESS_DEMAND → active la demande.
- *
- *   Sécurité (§5.3) : le numéro de l'annonce est chiffré AES-256. Lorsqu'on
- *   crée un ContactAccess, on stocke aussi une copie chiffrée du numéro pour
- *   audit et traçabilité (le numéro du listing peut être mis à jour plus
- *   tard sans invalider les accès historiques).
+ *     4. Si SUCCESS et type=DEMAND_LISTING/EXPRESS_DEMAND → active la demande.
  *
  * @author KOUTON Spynel
  */
 
-import { randomUUID } from "crypto";
 import {
-  PaymentMethod,
   PaymentStatus,
   PaymentType,
   Prisma,
@@ -36,108 +31,7 @@ import {
 } from "@prisma/client";
 import { prisma } from "../../config/prisma";
 import { logger } from "../../config/logger";
-import { env } from "../../config/env";
 import { AppError } from "../../utils/AppError";
-import { encrypt, decrypt, hmacSha256 } from "../../utils/crypto";
-import { getSettingNumber } from "../../services/settings.service";
-
-interface InitiateContactAccessInput {
-  userId: string;
-  listingId: string;
-  method: PaymentMethod;
-  provider?: string;
-}
-
-interface InitiateContactAccessResult {
-  payment: {
-    id: string;
-    amount: number;
-    currency: string;
-    status: PaymentStatus;
-    providerRef: string;
-  };
-  checkoutHint: {
-    kkiapayPublicKey?: string;
-    sandbox: boolean;
-    listingTitle: string;
-  };
-}
-
-/**
- * Initie un paiement pour accéder au contact d'une annonce.
- *
- * Flux : vérifie l'absence d'accès actif existant → crée un `Payment PENDING`
- * → retourne la référence à utiliser côté SDK KKiapay.
- *
- * @param input - `{ userId, listingId, method, provider? }`.
- * @returns `{ payment, checkoutHint }` — référence et clé publique KKiapay.
- * @throws {AppError} 404 si l'annonce est introuvable/inactive.
- * @throws {AppError} 409 si un accès actif existe déjà.
- */
-export async function initiateContactAccess(
-  input: InitiateContactAccessInput,
-): Promise<InitiateContactAccessResult> {
-  const listing = await prisma.listing.findFirst({
-    where: { id: input.listingId, deletedAt: null, status: "ACTIVE" },
-  });
-  if (!listing)
-    throw AppError.notFound(
-      "LISTING_NOT_FOUND",
-      "Annonce introuvable ou inactive.",
-    );
-
-  const existingAccess = await prisma.contactAccess.findFirst({
-    where: {
-      userId: input.userId,
-      listingId: input.listingId,
-      isActive: true,
-      expiresAt: { gt: new Date() },
-    },
-  });
-  if (existingAccess) {
-    throw AppError.conflict(
-      "CONTACT_ACCESS_ALREADY_ACTIVE",
-      "Vous avez déjà un accès actif à ce contact.",
-    );
-  }
-
-  const amount = await getSettingNumber("contact_access_price", 2500);
-  const providerRef = `ca_${randomUUID()}`;
-
-  const payment = await prisma.payment.create({
-    data: {
-      userId: input.userId,
-      type: PaymentType.CONTACT_ACCESS,
-      amount: amount,
-      currency: "XOF",
-      method: input.method,
-      provider: input.provider ?? null,
-      providerRef,
-      status: PaymentStatus.PENDING,
-      metadata: { listingId: input.listingId },
-    },
-  });
-
-  logger.info(
-    { paymentId: payment.id, userId: input.userId, listingId: input.listingId },
-    "🟢 Contact access payment initiated",
-  );
-
-  return {
-    payment: {
-      id: payment.id,
-      amount: Number(payment.amount),
-      currency: payment.currency,
-      status: payment.status,
-      providerRef: payment.providerRef!,
-    },
-    checkoutHint: {
-      kkiapayPublicKey: env.KKIAPAY_PUBLIC_KEY,
-      sandbox: env.KKIAPAY_SANDBOX,
-      listingTitle: listing.title,
-    },
-  };
-}
 
 export interface KkiapayWebhookBody {
   transactionId?: string;
@@ -157,7 +51,7 @@ export interface KkiapayWebhookBody {
 
 /**
  * Traite un webhook KKiapay : met à jour le `Payment` et déclenche les effets
- * de bord métier (ContactAccess, Subscription, DemandListing).
+ * de bord métier (Subscription, DemandListing).
  *
  * Idempotent : ignore les paiements déjà traités.
  *
@@ -166,7 +60,7 @@ export interface KkiapayWebhookBody {
 export async function handleWebhook(body: KkiapayWebhookBody): Promise<void> {
   // Extract custom providerRef from partnerId or stateData
   let ref = body.partnerId;
-  
+
   if (!ref && body.stateData) {
     if (typeof body.stateData === "string") {
       try {
@@ -233,9 +127,6 @@ export async function handleWebhook(body: KkiapayWebhookBody): Promise<void> {
   }
 
   switch (payment.type) {
-    case PaymentType.CONTACT_ACCESS:
-      await grantContactAccess(payment.id);
-      break;
     case PaymentType.SUBSCRIPTION:
       await activateSubscription(payment.id);
       break;
@@ -249,52 +140,6 @@ export async function handleWebhook(body: KkiapayWebhookBody): Promise<void> {
     { paymentId: payment.id, type: payment.type },
     "🟢 Payment SUCCESS processed",
   );
-}
-
-/**
- * Crée un `ContactAccess` après paiement réussi.
- *
- * Re-chiffre le numéro de l'annonce dans le champ `contactPhoneRevealed`
- * pour audit et traçabilité historique.
- *
- * @param paymentId - UUID du paiement.
- * @private
- */
-async function grantContactAccess(paymentId: string): Promise<void> {
-  const payment = await prisma.payment.findUnique({ where: { id: paymentId } });
-  if (!payment) return;
-  const meta = payment.metadata as { listingId?: string } | null;
-  if (!meta?.listingId) return;
-
-  const listing = await prisma.listing.findUnique({
-    where: { id: meta.listingId },
-  });
-  if (!listing) return;
-
-  const durationHours = await getSettingNumber(
-    "contact_access_duration_hours",
-    48,
-  );
-  const expiresAt = new Date(Date.now() + durationHours * 3600 * 1000);
-
-  await prisma.$transaction([
-    prisma.contactAccess.create({
-      data: {
-        userId: payment.userId,
-        listingId: listing.id,
-        paymentId: payment.id,
-        // Re-chiffré dans l'enregistrement d'accès (audit).
-        contactPhoneRevealed: encrypt(decrypt(listing.contactPhone)),
-        amountPaid: payment.amount,
-        expiresAt,
-        isActive: true,
-      },
-    }),
-    prisma.listing.update({
-      where: { id: listing.id },
-      data: { contactsCount: { increment: 1 } },
-    }),
-  ]);
 }
 
 /**
@@ -381,48 +226,4 @@ export async function getPaymentStatus(paymentId: string, userId: string) {
   if (!payment)
     throw AppError.notFound("PAYMENT_NOT_FOUND", "Paiement introuvable.");
   return payment;
-}
-
-/**
- * Récupère le contact chiffré d'une annonce après vérification d'accès.
- *
- * §5.3 — Ne retourne le contact réel qu'en présence d'un accès actif.
- * §5.4 — Inclut un `watermark` anti-capture d'écran.
- *
- * @param userId    - ID de l'acheteur (buyer).
- * @param listingId - UUID de l'annonce.
- * @returns `{ contactPhone, watermark, expiresAt }`.
- * @throws {AppError} 403 si aucun accès actif.
- */
-export async function getContactAccess(userId: string, listingId: string) {
-  const access = await prisma.contactAccess.findFirst({
-    where: { userId, listingId, isActive: true, expiresAt: { gt: new Date() } },
-    orderBy: { createdAt: "desc" },
-  });
-  if (!access) {
-    throw AppError.forbidden(
-      "NO_ACTIVE_ACCESS",
-      "Aucun accès actif à ce contact. Payez pour accéder.",
-    );
-  }
-  const contactPhone = decrypt(access.contactPhoneRevealed);
-  const watermark = buildWatermark(userId);
-
-  return {
-    contactPhone,
-    watermark,
-    expiresAt: access.expiresAt.toISOString(),
-  };
-}
-
-/**
- * Génère un watermark unique lié à l'utilisateur (anti-capture, §5.4).
- * @param userId - ID de l'utilisateur.
- * @returns Chaîne de watermark horodatée.
- * @private
- */
-function buildWatermark(userId: string): string {
-  const ts = Math.floor(Date.now() / 1000);
-  const short = hmacSha256(`${userId}:${ts}`).slice(0, 10);
-  return `OKKAZ-USER-${short}-${ts}`;
 }

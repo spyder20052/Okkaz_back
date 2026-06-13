@@ -1,12 +1,10 @@
 /**
  * @module modules/payments/payments.routes
- * @description Routes de paiements et accès contacts (§4.6, §5.3).
+ * @description Routes de paiements (§4.6).
  *
  * | Méthode | Chemin                           | Rôle(s)  | Description                   |
  * |---------|----------------------------------|----------|-------------------------------|
- * | POST    | /initiate-contact-access         | BUYER    | Initie un paiement contact    |
  * | POST    | /webhook                         | Public   | Webhook KKiapay (HMAC)        |
- * | GET     | /contact-access/:listing_id      | BUYER    | Récupère le contact révélé    |
  * | GET     | /:payment_id/status              | Auth     | Statut d'un paiement          |
  */
 
@@ -14,31 +12,14 @@ import { Router } from 'express';
 import * as controller from './payments.controller';
 import * as schemas from './payments.validator';
 import { authenticate } from '../../middlewares/authenticate';
-import { authorize } from '../../middlewares/authorize';
 import { validateRequest } from '../../middlewares/validateRequest';
 import { webhookSignature } from '../../middlewares/webhookSignature';
 import { asyncHandler } from '../../utils/asyncHandler';
 
 const router = Router();
 
-router.post(
-  '/initiate-contact-access',
-  authenticate,
-  authorize('BUYER'),
-  validateRequest({ body: schemas.initiateContactAccessSchema }),
-  asyncHandler(controller.initiateContactAccess),
-);
-
 // Webhook public protégé par vérification du secret KKiapay (cf. §5.1).
 router.post('/webhook', webhookSignature('x-kkiapay-secret'), asyncHandler(controller.webhook));
-
-router.get(
-  '/contact-access/:listing_id',
-  authenticate,
-  authorize('BUYER'),
-  validateRequest({ params: schemas.listingIdParamSchema }),
-  asyncHandler(controller.contactAccess),
-);
 
 router.get(
   '/:payment_id/status',

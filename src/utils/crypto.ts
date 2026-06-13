@@ -113,3 +113,19 @@ export function hmacSha256(message: string): string {
     .update(message)
     .digest("hex");
 }
+
+/**
+ * Génère un watermark unique lié à un utilisateur (anti-capture d'écran, §5.4).
+ *
+ * Retourné au frontend lorsqu'un numéro de contact réel est affiché, pour
+ * superposition discrète. Ne constitue pas une protection technique mais un
+ * frein psychologique et une piste d'audit.
+ *
+ * @param userId - ID de l'utilisateur qui consulte le contact.
+ * @returns Chaîne de watermark horodatée `OKKAZ-USER-<hash>-<ts>`.
+ */
+export function buildWatermark(userId: string): string {
+  const ts = Math.floor(Date.now() / 1000);
+  const short = hmacSha256(`${userId}:${ts}`).slice(0, 10);
+  return `OKKAZ-USER-${short}-${ts}`;
+}

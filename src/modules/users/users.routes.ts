@@ -28,7 +28,7 @@ router.patch(
 );
 
 router.get('/me/listings', authenticate, authorize('SELLER', 'SELLER_PRO'), asyncHandler(controller.getMyListings));
-router.get('/me/contact-accesses', authenticate, authorize('BUYER'), asyncHandler(controller.getMyContactAccesses));
+router.get('/me/contact-reveals', authenticate, authorize('BUYER'), asyncHandler(controller.getMyContactReveals));
 router.get('/me/payments', authenticate, asyncHandler(controller.getMyPayments));
 
 router.get(

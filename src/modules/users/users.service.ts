@@ -157,26 +157,25 @@ export async function getMyListings(userId: string, query: Record<string, unknow
 }
 
 /**
- * Liste les accès contacts achetés par l'utilisateur (paginé).
+ * Liste les contacts consultés par l'utilisateur (paginé).
  *
  * @param userId - ID de l'utilisateur (buyer).
  * @param query  - Query params de pagination.
- * @returns `{ items, meta }` — accès paginés avec listing et paiement associés.
+ * @returns `{ items, meta }` — consultations paginées avec l'annonce associée.
  */
-export async function getMyContactAccesses(userId: string, query: Record<string, unknown>) {
+export async function getMyContactReveals(userId: string, query: Record<string, unknown>) {
   const { page, limit, skip } = parsePagination(query);
   const [items, total] = await Promise.all([
-    prisma.contactAccess.findMany({
+    prisma.contactReveal.findMany({
       where: { userId },
       orderBy: { createdAt: 'desc' },
       skip,
       take: limit,
       include: {
         listing: { select: { id: true, title: true, slug: true } },
-        payment: { select: { id: true, status: true, amount: true, method: true, provider: true } },
       },
     }),
-    prisma.contactAccess.count({ where: { userId } }),
+    prisma.contactReveal.count({ where: { userId } }),
   ]);
   return { items, meta: buildPaginationMeta(page, limit, total) };
 }

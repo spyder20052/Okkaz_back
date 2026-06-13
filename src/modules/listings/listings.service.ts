@@ -9,13 +9,18 @@
  * @author KOUTON Spynel
  */
 
-import { ListingStatus, Prisma, UserRole } from "@prisma/client";
+import {
+  ListingStatus,
+  Prisma,
+  SubscriptionStatus,
+  UserRole,
+} from "@prisma/client";
 import { prisma } from "../../config/prisma";
 import { logger } from "../../config/logger";
 import { env } from "../../config/env";
 import { AppError } from "../../utils/AppError";
 import { parsePagination, buildPaginationMeta } from "../../utils/pagination";
-import { encrypt } from "../../utils/crypto";
+import { encrypt, decrypt, buildWatermark } from "../../utils/crypto";
 import { uniqueSlug } from "../../utils/slug";
 import { assertUserKycApproved } from "../kyc/kyc.service";
 import { getSettingNumber } from "../../services/settings.service";
@@ -389,10 +394,66 @@ export async function getDetail(listingId: string) {
     .catch((err) => logger.warn({ err, listingId }, "view increment failed"));
 
   // Ne renvoie jamais contactPhone en clair ici. Affiche uniquement le WCC.
+  // Le numéro réel (si l'annonceur est abonné) n'est dévoilé que par
+  // `revealContact` (POST /:id/contact).
   return {
     ...stripPrivateFields(listing),
     contactPhoneDisplayed: listing.contactPhoneWcc,
   };
+}
+
+/**
+ * Dévoile (gratuitement) les coordonnées d'une annonce à un locataire et
+ * enregistre la consultation (§3.7, §4.6, §6.3).
+ *
+ * Règle d'affichage :
+ *   - Annonceur avec abonnement ACTIF → son numéro réel (déchiffré).
+ *   - Sinon → numéro intermédiaire de la plateforme (`contactPhoneWcc`).
+ *
+ * La consultation est tracée une seule fois par couple (utilisateur, annonce)
+ * — elle conditionne la possibilité de laisser un avis (cf. reviews.service).
+ * La première consultation incrémente `contactsCount`.
+ *
+ * @param userId    - ID du locataire (BUYER) qui consulte.
+ * @param listingId - UUID de l'annonce.
+ * @returns `{ contactPhone, isOwnerNumber, watermark }`.
+ * @throws {AppError} 404 si l'annonce est introuvable/inactive.
+ */
+export async function revealContact(userId: string, listingId: string) {
+  const listing = await prisma.listing.findFirst({
+    where: { id: listingId, deletedAt: null, status: ListingStatus.ACTIVE },
+  });
+  if (!listing)
+    throw AppError.notFound("LISTING_NOT_FOUND", "Annonce introuvable.");
+
+  // L'annonceur a-t-il un abonnement actif ?
+  const activeSubscription = await prisma.subscription.findFirst({
+    where: {
+      userId: listing.userId,
+      status: SubscriptionStatus.ACTIVE,
+      endsAt: { gt: new Date() },
+    },
+  });
+  const isOwnerNumber = Boolean(activeSubscription);
+  const contactPhone = isOwnerNumber
+    ? decrypt(listing.contactPhone)
+    : listing.contactPhoneWcc;
+
+  // Enregistre la consultation (idempotent : une entrée par (user, listing)).
+  const existing = await prisma.contactReveal.findUnique({
+    where: { userId_listingId: { userId, listingId } },
+  });
+  if (!existing) {
+    await prisma.$transaction([
+      prisma.contactReveal.create({ data: { userId, listingId } }),
+      prisma.listing.update({
+        where: { id: listingId },
+        data: { contactsCount: { increment: 1 } },
+      }),
+    ]);
+  }
+
+  return { contactPhone, isOwnerNumber, watermark: buildWatermark(userId) };
 }
 
 // --- Photos ------------------------------------------------------------------

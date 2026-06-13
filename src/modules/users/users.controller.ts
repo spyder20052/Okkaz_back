@@ -67,13 +67,13 @@ export async function getMyListings(req: Request, res: Response): Promise<Respon
 }
 
 /**
- * `GET /users/me/contact-accesses` — Accès contacts achetés.
+ * `GET /users/me/contact-reveals` — Contacts consultés.
  *
  * @param req - Query params de pagination.
  * @param res - 200 OK avec `{ items, meta }`.
  */
-export async function getMyContactAccesses(req: Request, res: Response): Promise<Response> {
-  const { items, meta } = await service.getMyContactAccesses(req.user!.id, req.query as Record<string, unknown>);
+export async function getMyContactReveals(req: Request, res: Response): Promise<Response> {
+  const { items, meta } = await service.getMyContactReveals(req.user!.id, req.query as Record<string, unknown>);
   return sendPaginated(res, items, meta);
 }
 

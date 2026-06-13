@@ -18,6 +18,14 @@ router.get('/featured', asyncHandler(controller.featured));
 router.get('/:id', validateRequest({ params: schemas.listingIdParamSchema }), asyncHandler(controller.detail));
 
 router.post(
+  '/:id/contact',
+  authenticate,
+  authorize('BUYER'),
+  validateRequest({ params: schemas.listingIdParamSchema }),
+  asyncHandler(controller.revealContact),
+);
+
+router.post(
   '/',
   authenticate,
   authorize('SELLER', 'SELLER_PRO'),

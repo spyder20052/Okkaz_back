@@ -27,7 +27,7 @@ export const listAdminListingsQuerySchema = z.object({
 });
 
 export const listPaymentsQuerySchema = z.object({
-  type: z.enum(['CONTACT_ACCESS', 'SUBSCRIPTION', 'DEMAND_LISTING', 'EXPRESS_DEMAND']).optional(),
+  type: z.enum(['SUBSCRIPTION', 'DEMAND_LISTING', 'EXPRESS_DEMAND']).optional(),
   status: z.enum(['PENDING', 'SUCCESS', 'FAILED', 'REFUNDED']).optional(),
   method: z.enum(['MOBILE_MONEY', 'CARD']).optional(),
   userId: z.string().uuid().optional(),

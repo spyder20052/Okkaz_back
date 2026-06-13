@@ -8,9 +8,10 @@
  */
 
 import { createApp } from "./app";
-import { env } from "./config/env";
+import { env, isTest } from "./config/env";
 import { prisma } from "./config/prisma";
 import { logger } from "./config/logger";
+import { startReviewReminderJob } from "./jobs/reviewReminder.job";
 
 const app = createApp();
 
@@ -19,6 +20,8 @@ const server = app.listen(env.PORT, () => {
     { port: env.PORT, env: env.NODE_ENV, prefix: env.API_PREFIX },
     `🚀 OKKAZ API running on http://localhost:${env.PORT}`,
   );
+  // Jobs périodiques (désactivés en environnement de test).
+  if (!isTest) startReviewReminderJob();
 });
 
 // ── Arrêt propre ─────────────────────────────────────────────────────────────

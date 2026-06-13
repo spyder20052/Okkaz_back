@@ -8,6 +8,7 @@
  *     - Vérification d'email (§4.1)
  *     - Réinitialisation de mot de passe (§4.1)
  *     - Notifications admin (validation KYC/annonce)
+ *     - Rappel de dépôt d'avis après consultation d'un contact (§4.9)
  *
  * @author KOUTON Spynel
  */
@@ -116,5 +117,38 @@ export function buildResetPasswordHtml(
     subject: "OKKAZ — Réinitialisation du mot de passe",
     text: `Bonjour ${firstName},\n\nRéinitialisez votre mot de passe : ${link}\nCe lien expire dans 1 heure.\n`,
     html: `<p>Bonjour ${firstName},</p><p>Réinitialisez votre mot de passe : <a href="${link}">${link}</a></p><p>Ce lien expire dans 1 heure.</p>`,
+  };
+}
+
+/**
+ * Construit le contenu email de rappel de dépôt d'avis (§4.9).
+ *
+ * Envoyé un délai configurable après la consultation d'un contact, si
+ * l'utilisateur n'a pas encore laissé d'avis sur l'annonce concernée.
+ *
+ * @param firstName    - Prénom de l'utilisateur.
+ * @param listingTitle - Titre de l'annonce consultée.
+ * @param listingSlug  - Slug de l'annonce (pour construire le lien).
+ * @returns `{ subject, text, html }`.
+ */
+export function buildReviewReminderHtml(
+  firstName: string,
+  listingTitle: string,
+  listingSlug: string,
+): { subject: string; text: string; html: string } {
+  const link = `${env.FRONTEND_URL}/listings/${listingSlug}`;
+  return {
+    subject: "OKKAZ — Partagez votre avis",
+    text:
+      `Bonjour ${firstName},\n\n` +
+      `Vous avez récemment consulté l'annonce « ${listingTitle} ». ` +
+      `Votre retour aiderait les autres utilisateurs : laissez un avis ici : ${link}\n\n` +
+      `Merci d'utiliser OKKAZ.`,
+    html:
+      `<p>Bonjour ${firstName},</p>` +
+      `<p>Vous avez récemment consulté l'annonce « <strong>${listingTitle}</strong> ». ` +
+      `Votre retour aiderait les autres utilisateurs.</p>` +
+      `<p><a href="${link}">Laisser un avis</a></p>` +
+      `<p>Merci d'utiliser OKKAZ.</p>`,
   };
 }

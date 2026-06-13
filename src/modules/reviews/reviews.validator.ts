@@ -20,3 +20,6 @@ export const createReviewSchema = z.object({
 export const listingIdParamSchema = z.object({ listing_id: z.string().uuid() });
 /** Paramètre URL `:id` (UUID de l'avis). */
 export const reviewIdParamSchema = z.object({ id: z.string().uuid() });
+
+/** Corps de modération d'un avis : `{ isModerated }`. */
+export const moderateReviewSchema = z.object({ isModerated: z.boolean() });
