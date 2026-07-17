@@ -4,13 +4,14 @@ import { useEffect, useRef } from "react";
 import Link from "next/link";
 import styles from "@/app/page.module.css";
 
+// Les liens pointent vers les slugs réels des catégories backend (GET /categories).
 const ITEMS = [
-  { href: "/annonces?category=Véhicules", image: "/vehicules.png", title: "Véhicules" },
-  { href: "/annonces?category=Immobilier", image: "/hero.PNG", title: "Maisons" },
-  { href: "/annonces?category=Électronique", image: "/electronique.png", title: "Tech" },
-  { href: "/annonces?category=Équipements Pro", image: "/equipements-pro.png", title: "Matériel pro" },
-  { href: "/annonces", image: "/evenementiel.png", title: "Événements" },
-  { href: "/annonces", image: "/mobilier-deco.png", title: "Mobilier" },
+  { href: "/annonces?category=automobiles", image: "/vehicules.png", title: "Véhicules" },
+  { href: "/annonces?category=immobilier", image: "/hero.PNG", title: "Maisons" },
+  { href: "/annonces?category=electronique", image: "/electronique.png", title: "Tech" },
+  { href: "/annonces?category=outils-de-travail", image: "/equipements-pro.png", title: "Matériel pro" },
+  { href: "/annonces?category=divertissement", image: "/evenementiel.png", title: "Événements" },
+  { href: "/annonces?category=electromenager", image: "/mobilier-deco.png", title: "Électroménager" },
 ];
 
 export default function GallerySection() {

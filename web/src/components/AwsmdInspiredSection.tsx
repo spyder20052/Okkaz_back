@@ -2,35 +2,47 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import gsap from "gsap";
 import ScrollTrigger from "gsap/ScrollTrigger";
 import { useGSAP } from "@gsap/react";
+import { api, mediaUrl } from "@/lib/api";
+import { formatPrice, RENTAL_PERIOD_LABELS, type Listing } from "@/lib/types";
 import styles from "./AwsmdInspiredSection.module.css";
 
 gsap.registerPlugin(ScrollTrigger);
 
-import { mockAds } from "@/lib/data";
-
 const TONES = [styles.lime, styles.soft, styles.mint, styles.blue];
 
-const LISTINGS = mockAds.map((ad, index) => {
-  const tone = TONES[index % TONES.length];
-  const terms = ad.loaPossible ? "Achat / Vente" : "Location";
-  const durationLabel = ad.id === "4" ? "jour" : "mois";
+interface DisplayListing {
+  href: string;
+  category: string;
+  terms: string;
+  title: string;
+  seller: string;
+  location: string;
+  price: string;
+  image: string;
+  tone: string;
+}
 
+function toDisplay(listing: Listing, index: number): DisplayListing {
+  const photos = listing.photos ?? [];
+  const cover = photos.find((photo) => photo.isCover) ?? photos[0];
   return {
-    href: `/annonces/${ad.id}`,
-    category: ad.category,
-    terms,
-    title: ad.title,
-    seller: ad.owner,
-    location: ad.location,
-    price: `${ad.price.toLocaleString("fr-FR")} FCFA / ${durationLabel}`,
-    image: ad.image,
-    tone,
+    href: `/annonces/${listing.id}`,
+    category: listing.category?.name ?? "Annonce",
+    terms: listing.isLoa ? "Achat / Vente" : "Location",
+    title: listing.title,
+    seller: listing.owner
+      ? `${listing.owner.firstName} ${listing.owner.lastName}`
+      : "Vendeur OKKAZ",
+    location: listing.locationCity,
+    price: `${formatPrice(listing.rentalPrice)} / ${RENTAL_PERIOD_LABELS[listing.rentalPeriod]}`,
+    image: mediaUrl(cover?.url),
+    tone: TONES[index % TONES.length],
   };
-});
+}
 
 export default function AwsmdInspiredSection() {
   const sectionRef = useRef<HTMLElement>(null);
@@ -38,6 +50,33 @@ export default function AwsmdInspiredSection() {
   const titleMovingRef = useRef<HTMLSpanElement>(null);
   const cardsRef = useRef<HTMLDivElement>(null);
   const listingRefs = useRef<(HTMLAnchorElement | null)[]>([]);
+
+  const [listings, setListings] = useState<DisplayListing[]>([]);
+
+  // Annonces en vedette, avec repli sur les annonces récentes si aucune vedette.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const featured = await api.get<{ items: Listing[] }>("/listings/featured", undefined, false);
+        let items = featured.data.items;
+        if (items.length === 0) {
+          const recent = await api.getPaginated<Listing>(
+            "/listings",
+            { limit: 4, sort: "recent" },
+            false,
+          );
+          items = recent.data;
+        }
+        if (!cancelled) setListings(items.slice(0, 4).map(toDisplay));
+      } catch {
+        if (!cancelled) setListings([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useGSAP(() => {
     const mm = gsap.matchMedia();
@@ -59,6 +98,7 @@ export default function AwsmdInspiredSection() {
 
     mm.add("(min-width: 0px)", () => {
       const cards = listingRefs.current.filter((card): card is HTMLAnchorElement => Boolean(card));
+      if (cards.length === 0) return;
       const images = cards
         .map((card) => card.querySelector(`.${styles.imageWrap}`))
         .filter((image): image is Element => Boolean(image));
@@ -122,7 +162,7 @@ export default function AwsmdInspiredSection() {
     );
 
     return () => mm.revert();
-  }, { scope: sectionRef });
+  }, { scope: sectionRef, dependencies: [listings.length], revertOnUpdate: true });
 
 
   return (
@@ -146,11 +186,11 @@ export default function AwsmdInspiredSection() {
         </div>
 
         <div className={styles.cards} ref={cardsRef} aria-label="Publications des vendeurs OKKAZ">
-          {LISTINGS.map((listing, index) => (
+          {listings.map((listing, index) => (
             <Link
               href={listing.href}
               className={`${styles.card} ${listing.tone}`}
-              key={listing.title}
+              key={listing.href}
               ref={(el) => { listingRefs.current[index] = el; }}
             >
               <div className={styles.imageWrap}>

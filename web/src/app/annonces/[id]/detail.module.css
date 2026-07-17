@@ -516,6 +516,106 @@
   line-height: 1.3;
 }
 
+/* ─── MESSAGES FORMULAIRES ─── */
+
+.formError {
+  margin: 0.4rem 0 0;
+  border-radius: 10px;
+  padding: 0.65rem 0.85rem;
+  background: rgba(220, 38, 38, 0.08);
+  color: #b91c1c;
+  font-size: 0.8rem;
+  font-weight: 650;
+  line-height: 1.4;
+}
+
+.formInfo {
+  margin: 0.4rem 0 0;
+  border-radius: 10px;
+  padding: 0.65rem 0.85rem;
+  background: rgba(22, 163, 74, 0.08);
+  color: #15803d;
+  font-size: 0.8rem;
+  font-weight: 650;
+  line-height: 1.4;
+}
+
+/* ─── SIGNALEMENT ─── */
+
+.reportToggle {
+  background: none;
+  border: none;
+  padding: 0;
+  color: rgba(17, 17, 17, 0.5);
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: underline;
+  transition: color 0.15s ease;
+}
+
+.reportToggle:hover {
+  color: #b91c1c;
+}
+
+.reportForm {
+  margin-top: 0.75rem;
+  padding: 1rem;
+  border: 1px solid rgba(17, 17, 17, 0.1);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.reportForm label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: rgba(17, 17, 17, 0.5);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.reportForm select,
+.reportForm textarea {
+  border: 1px solid rgba(17, 17, 17, 0.12);
+  border-radius: 10px;
+  padding: 0.6rem 0.75rem;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 550;
+  color: #111111;
+  background: #ffffff;
+  outline: none;
+}
+
+.reportForm select:focus,
+.reportForm textarea:focus {
+  border-color: #111111;
+}
+
+.reportForm button {
+  align-self: flex-start;
+  min-height: 2.5rem;
+  padding: 0 1.1rem;
+  border-radius: 10px;
+  border: none;
+  background: #111111;
+  color: #ffffff;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 760;
+  cursor: pointer;
+}
+
+.reportForm button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 /* ─── MISSING ─── */
 
 .missing {

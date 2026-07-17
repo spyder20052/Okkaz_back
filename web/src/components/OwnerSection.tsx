@@ -92,7 +92,7 @@ export default function OwnerSection() {
 
       <div className={styles.ownerCards} aria-label="Avantages pour les propriétaires">
         <Link
-          href="/admin"
+          href="/vendeur"
           ref={(el) => { cardsRef.current[0] = el; }}
           className={`${styles.ownerCard} ${styles.ownerCardPink}`}
         >
@@ -102,7 +102,7 @@ export default function OwnerSection() {
         </Link>
 
         <Link
-          href="/admin"
+          href="/vendeur"
           ref={(el) => { cardsRef.current[1] = el; }}
           className={`${styles.ownerCard} ${styles.ownerCardGreen}`}
         >
@@ -112,7 +112,7 @@ export default function OwnerSection() {
         </Link>
 
         <Link
-          href="/admin"
+          href="/vendeur"
           ref={(el) => { cardsRef.current[2] = el; }}
           className={`${styles.ownerCard} ${styles.ownerCardOrange}`}
         >

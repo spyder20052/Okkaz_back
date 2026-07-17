@@ -1,68 +1,116 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { api, ApiError } from "@/lib/api";
+import {
+  formatPrice,
+  type DashboardStats,
+  type Payment,
+  type PaymentStatus,
+} from "@/lib/types";
 import AdminShell from "../AdminShell";
 import styles from "../admin.module.css";
 
-type ServiceKey = "Option Numéro Direct" | "Boost" | "Abonnement";
+type Meta = { page: number; limit: number; total: number; totalPages: number };
+type PaymentType = Payment["type"];
 
-const SERVICE_COLOR: Record<ServiceKey, "blue" | "orange" | "violet"> = {
-  "Option Numéro Direct": "blue",
-  "Boost": "orange",
-  "Abonnement": "violet",
+const TYPE_LABELS: Record<PaymentType, string> = {
+  SUBSCRIPTION: "Abonnement",
+  DEMAND_LISTING: "Demande",
+  EXPRESS_DEMAND: "Demande express",
 };
 
-type Transaction = {
-  ref: string;
-  service: ServiceKey;
-  user: string;
-  target: string;
-  method: string;
-  date: string;
-  amount: number;
-  status: "Encaissé" | "En attente" | "Échec";
+const TYPE_COLOR: Record<PaymentType, "violet" | "blue" | "orange"> = {
+  SUBSCRIPTION: "violet",
+  DEMAND_LISTING: "blue",
+  EXPRESS_DEMAND: "orange",
 };
 
-const transactions: Transaction[] = [
-  { ref: "DIR-9981", service: "Option Numéro Direct", user: "Yann A.", target: "Mercedes-Benz Classe G", method: "MTN MoMo", date: "23/05 14:32", amount: 2500, status: "Encaissé" },
-  { ref: "DIR-9978", service: "Option Numéro Direct", user: "Carine T.", target: "iPhone 15 Pro Max", method: "Carte Visa", date: "23/05 12:08", amount: 2500, status: "Encaissé" },
-  { ref: "BST-204", service: "Boost", user: "Adrien K.", target: "Generatrice 5 kVA", method: "Moov Money", date: "23/05 11:22", amount: 5000, status: "Encaissé" },
-  { ref: "DIR-9974", service: "Option Numéro Direct", user: "Saliou D.", target: "Studio Fidjrosse", method: "MTN MoMo", date: "23/05 09:47", amount: 2500, status: "Encaissé" },
-  { ref: "ABO-127", service: "Abonnement", user: "Immo Bénin", target: "Mensuel mai 2026", method: "Carte Visa", date: "22/05 18:12", amount: 10000, status: "Encaissé" },
-  { ref: "BST-088", service: "Boost", user: "Lara D.", target: "Bureau Akpakpa", method: "MTN MoMo", date: "22/05 16:40", amount: 5000, status: "Encaissé" },
-  { ref: "DIR-9962", service: "Option Numéro Direct", user: "Patrice N.", target: "Camionnette 3T", method: "Moov Money", date: "22/05 11:03", amount: 2500, status: "En attente" },
-  { ref: "DIR-9951", service: "Option Numéro Direct", user: "Mireille O.", target: "Climatiseur split", method: "Carte Visa", date: "21/05 13:18", amount: 2500, status: "Échec" },
-];
-
-type Filter = "all" | "direct" | "boost" | "abo";
-
-const FILTER_LABEL: Record<Filter, string> = {
-  all: "Toutes",
-  direct: "Option Numéro Direct",
-  boost: "Boost",
-  abo: "Abonnements",
+const STATUS_LABELS: Record<PaymentStatus, string> = {
+  PENDING: "En attente",
+  SUCCESS: "Encaissé",
+  FAILED: "Échec",
+  REFUNDED: "Remboursé",
 };
+
+const STATUS_STYLE: Record<PaymentStatus, "ok" | "wait" | "fail"> = {
+  SUCCESS: "ok",
+  PENDING: "wait",
+  FAILED: "fail",
+  REFUNDED: "wait",
+};
+
+function formatDate(iso: string): string {
+  const d = new Date(iso);
+  return d.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" }) +
+    " " + d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+}
+
+function exportCsv(payments: Payment[]) {
+  const header = ["Reference", "Type", "Utilisateur", "Email", "Methode", "Statut", "Montant", "Devise", "Date"];
+  const rows = payments.map((p) => [
+    p.id,
+    TYPE_LABELS[p.type],
+    p.user ? `${p.user.firstName} ${p.user.lastName}` : "",
+    p.user?.email ?? "",
+    p.method,
+    STATUS_LABELS[p.status],
+    String(p.amount),
+    p.currency,
+    p.createdAt,
+  ]);
+  const csv = [header, ...rows]
+    .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(";"))
+    .join("\n");
+  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `paiements-okkaz-${new Date().toISOString().slice(0, 10)}.csv`;
+  link.click();
+  URL.revokeObjectURL(url);
+}
 
 export default function AdminPaiementsPage() {
-  const [filter, setFilter] = useState<Filter>("all");
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [meta, setMeta] = useState<Meta | null>(null);
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [typeFilter, setTypeFilter] = useState<PaymentType | "">("");
+  const [statusFilter, setStatusFilter] = useState<PaymentStatus | "">("");
+  const [page, setPage] = useState(1);
+  const [loading, setLoading] = useState(true);
+  const [feedback, setFeedback] = useState<string | null>(null);
 
-  const matched = (t: Transaction) => {
-    if (filter === "all") return true;
-    if (filter === "direct") return t.service === "Option Numéro Direct";
-    if (filter === "boost") return t.service === "Boost";
-    if (filter === "abo") return t.service === "Abonnement";
-    return true;
-  };
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await api.getPaginated<Payment>("/admin/payments", {
+        type: typeFilter || undefined,
+        status: statusFilter || undefined,
+        page,
+        limit: 15,
+      });
+      setPayments(res.data);
+      setMeta(res.meta);
+    } catch (err) {
+      setFeedback(err instanceof ApiError ? err.message : "Impossible de charger les paiements.");
+    } finally {
+      setLoading(false);
+    }
+  }, [typeFilter, statusFilter, page]);
 
-  const filtered = transactions.filter(matched);
-  const ok = transactions.filter((t) => t.status === "Encaissé");
-  const totalRevenue = ok.reduce((s, t) => s + t.amount, 0);
-  const counts = {
-    direct: ok.filter((t) => t.service === "Option Numéro Direct").length,
-    boost: ok.filter((t) => t.service === "Boost").length,
-    abo: ok.filter((t) => t.service === "Abonnement").length,
-  };
+  useEffect(() => {
+    const timer = setTimeout(() => void load(), 0);
+    return () => clearTimeout(timer);
+  }, [load]);
+
+  useEffect(() => {
+    api
+      .get<DashboardStats>("/admin/dashboard/stats")
+      .then((res) => setStats(res.data))
+      .catch(() => undefined);
+  }, []);
 
   return (
     <AdminShell active="/admin/paiements">
@@ -82,78 +130,144 @@ export default function AdminPaiementsPage() {
             <span className={`${styles.statTileIcon} ${styles.statTileIconGreen}`}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
             </span>
-            <small>REVENU</small>
-            <strong>{totalRevenue.toLocaleString("fr-FR")}<em>F</em></strong>
-            <p>30 derniers jours</p>
+            <small>REVENU TOTAL</small>
+            <strong>{stats ? (stats.totalRevenue).toLocaleString("fr-FR") : "…"}<em>F</em></strong>
+            <p>encaissé sur la plateforme</p>
           </div>
           <div className={styles.statTile}>
             <span className={`${styles.statTileIcon} ${styles.statTileIconBlue}`}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
             </span>
-            <small>NUMÉRO DIRECT</small>
-            <strong>{counts.direct}</strong>
-            <p>2 500 FCFA / option</p>
+            <small>TRANSACTIONS</small>
+            <strong>{stats?.totalTransactions ?? "…"}</strong>
+            <p>paiements réussis</p>
           </div>
           <div className={styles.statTile}>
             <span className={`${styles.statTileIcon} ${styles.statTileIconOrange}`}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
             </span>
-            <small>BOOSTS</small>
-            <strong>{counts.boost}</strong>
-            <p>5 000 FCFA / boost</p>
+            <small>EN ATTENTE</small>
+            <strong>{payments.filter((p) => p.status === "PENDING").length}</strong>
+            <p>sur cette page</p>
           </div>
           <div className={styles.statTile}>
             <span className={`${styles.statTileIcon} ${styles.statTileIconViolet}`}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
             </span>
-            <small>PREMIUM</small>
-            <strong>{counts.abo}</strong>
-            <p>abonnements actifs</p>
+            <small>RÉSULTATS</small>
+            <strong>{meta?.total ?? "…"}</strong>
+            <p>pour les filtres actifs</p>
           </div>
         </div>
 
         <div className={styles.adminFilterBar}>
-          {(Object.keys(FILTER_LABEL) as Filter[]).map((f) => (
+          <button
+            type="button"
+            className={`${styles.adminFilterPill} ${typeFilter === "" ? styles.adminFilterPillActive : ""}`}
+            onClick={() => { setTypeFilter(""); setPage(1); }}
+          >
+            Tous types
+          </button>
+          {(Object.keys(TYPE_LABELS) as PaymentType[]).map((t) => (
             <button
-              key={f}
+              key={t}
               type="button"
-              className={`${styles.adminFilterPill} ${filter === f ? styles.adminFilterPillActive : ""}`}
-              onClick={() => setFilter(f)}
+              className={`${styles.adminFilterPill} ${typeFilter === t ? styles.adminFilterPillActive : ""}`}
+              onClick={() => { setTypeFilter(t); setPage(1); }}
             >
-              {FILTER_LABEL[f]}
+              {TYPE_LABELS[t]}
             </button>
           ))}
-          <button type="button" className={styles.adminFilterExport}>
+          <button
+            type="button"
+            className={styles.adminFilterExport}
+            onClick={() => exportCsv(payments)}
+            disabled={payments.length === 0}
+          >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
             Exporter
           </button>
         </div>
+        <div className={styles.adminFilterBar}>
+          <button
+            type="button"
+            className={`${styles.adminFilterPill} ${statusFilter === "" ? styles.adminFilterPillActive : ""}`}
+            onClick={() => { setStatusFilter(""); setPage(1); }}
+          >
+            Tous statuts
+          </button>
+          {(Object.keys(STATUS_LABELS) as PaymentStatus[]).map((s) => (
+            <button
+              key={s}
+              type="button"
+              className={`${styles.adminFilterPill} ${statusFilter === s ? styles.adminFilterPillActive : ""}`}
+              onClick={() => { setStatusFilter(s); setPage(1); }}
+            >
+              {STATUS_LABELS[s]}
+            </button>
+          ))}
+        </div>
 
         <h2 className={styles.spaceSectionTitle}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/></svg>
-          {filtered.length} transaction{filtered.length > 1 ? "s" : ""}
+          {meta?.total ?? 0} transaction{(meta?.total ?? 0) > 1 ? "s" : ""}
         </h2>
 
-        <ul className={styles.adminModerationList}>
-          {filtered.map((t) => (
-            <li key={t.ref} className={styles.adminModerationItem}>
-              <span className={`${styles.adminModerationRef} ${styles[`adminModerationRef_${SERVICE_COLOR[t.service]}`]}`}>{t.ref}</span>
-              <div>
-                <strong>{t.user}</strong>
-                <p>
-                  <em className={`${styles.adminTxService} ${styles[`adminTxService_${SERVICE_COLOR[t.service]}`]}`}>{t.service}</em>
-                  {" · "}{t.target} · {t.method} · {t.date}
-                </p>
-              </div>
-              <div className={styles.adminModerationActions}>
-                <span className={`${styles.adminUserStatus} ${styles[`adminUserStatus_${t.status === "Encaissé" ? "ok" : t.status === "En attente" ? "wait" : "fail"}`]}`}>
-                  {t.status}
+        {feedback ? <p className={styles.adminModerationEmpty}>{feedback}</p> : null}
+
+        {loading ? (
+          <p className={styles.adminModerationEmpty}>Chargement des paiements...</p>
+        ) : payments.length === 0 ? (
+          <p className={styles.adminModerationEmpty}>Aucun paiement ne correspond aux filtres.</p>
+        ) : (
+          <ul className={styles.adminModerationList}>
+            {payments.map((t) => (
+              <li key={t.id} className={styles.adminModerationItem}>
+                <span className={`${styles.adminModerationRef} ${styles[`adminModerationRef_${TYPE_COLOR[t.type] === "violet" ? "blue" : TYPE_COLOR[t.type]}`]}`}>
+                  {t.id.slice(0, 8)}
                 </span>
-                <strong className={styles.adminTxAmount}>{t.amount.toLocaleString("fr-FR")} F</strong>
-              </div>
-            </li>
-          ))}
-        </ul>
+                <div>
+                  <strong>{t.user ? `${t.user.firstName} ${t.user.lastName}` : "Utilisateur inconnu"}</strong>
+                  <p>
+                    <em className={`${styles.adminTxService} ${styles[`adminTxService_${TYPE_COLOR[t.type]}`]}`}>{TYPE_LABELS[t.type]}</em>
+                    {" · "}{t.method === "MOBILE_MONEY" ? "Mobile Money" : "Carte"}
+                    {t.provider ? ` (${t.provider})` : ""} · {formatDate(t.createdAt)}
+                  </p>
+                </div>
+                <div className={styles.adminModerationActions}>
+                  <span className={`${styles.adminUserStatus} ${styles[`adminUserStatus_${STATUS_STYLE[t.status]}`]}`}>
+                    {STATUS_LABELS[t.status]}
+                  </span>
+                  <strong className={styles.adminTxAmount}>{formatPrice(t.amount)}</strong>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {meta && meta.totalPages > 1 ? (
+          <div className={styles.buttonRow} style={{ marginTop: 16 }}>
+            <button
+              type="button"
+              className={styles.adminActionSecondary}
+              disabled={page <= 1}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+            >
+              Page précédente
+            </button>
+            <span style={{ alignSelf: "center", fontWeight: 800, fontSize: "0.82rem" }}>
+              Page {meta.page} / {meta.totalPages}
+            </span>
+            <button
+              type="button"
+              className={styles.adminActionSecondary}
+              disabled={page >= meta.totalPages}
+              onClick={() => setPage((p) => p + 1)}
+            >
+              Page suivante
+            </button>
+          </div>
+        ) : null}
       </section>
     </AdminShell>
   );

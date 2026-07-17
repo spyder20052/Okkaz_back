@@ -407,6 +407,50 @@
   padding: 8rem 4vw;
 }
 
+.stateMessage {
+  margin: 0 0 1.5rem;
+  color: rgba(16, 20, 24, 0.62);
+  font-size: 0.95rem;
+  font-weight: 650;
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  margin-top: 2.5rem;
+}
+
+.pagination span {
+  color: rgba(16, 20, 24, 0.62);
+  font-size: 0.8rem;
+  font-weight: 780;
+}
+
+.pagination button {
+  min-height: 2.8rem;
+  border: 1px solid rgba(17, 17, 17, 0.12);
+  border-radius: 999px;
+  padding: 0 1.1rem;
+  background: #ffffff;
+  color: #101418;
+  font-size: 0.78rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.pagination button:hover:not(:disabled) {
+  background: #111111;
+  color: #ffffff;
+}
+
+.pagination button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
 .productPage {
   min-height: 100vh;
   padding: 7rem 4vw 5rem;

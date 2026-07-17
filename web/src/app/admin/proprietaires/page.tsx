@@ -11,6 +11,19 @@ export default function AdminProprietairesPage() {
   return (
     <AdminShell active="/admin/proprietaires">
       <section className={styles.content}>
+        <p
+          style={{
+            margin: "0 0 16px",
+            padding: "12px 16px",
+            borderRadius: 12,
+            background: "rgba(234, 179, 8, 0.14)",
+            color: "#92400e",
+            fontWeight: 800,
+            fontSize: "0.86rem",
+          }}
+        >
+          ⚠️ Démo statique — non connecté au backend (endpoint manquant)
+        </p>
         <header className={styles.header}>
           <div>
             <h1>Proprietaires</h1>

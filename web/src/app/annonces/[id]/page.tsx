@@ -1,17 +1,77 @@
 "use client";
 
-import { use, useState } from "react";
-import type { MouseEvent } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
+import type { FormEvent, MouseEvent } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
-import { mockAds } from "@/lib/data";
+import { useParams, useSearchParams } from "next/navigation";
+import { api, ApiError, mediaUrl } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
+import {
+  CONDITION_LABELS,
+  formatPrice,
+  RENTAL_PERIOD_LABELS,
+  type Listing,
+  type ReportReason,
+  type Review,
+} from "@/lib/types";
 import styles from "./detail.module.css";
 
-export default function AdDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params);
+const ROLE_LABELS: Record<string, string> = {
+  BUYER: "Acheteur",
+  SELLER: "Vendeur",
+  SELLER_PRO: "Vendeur Pro",
+  ADMIN: "Équipe OKKAZ",
+};
+
+const REPORT_REASONS: { value: ReportReason; label: string }[] = [
+  { value: "FRAUD", label: "Fraude / arnaque" },
+  { value: "WRONG_INFO", label: "Informations erronées" },
+  { value: "INAPPROPRIATE", label: "Contenu inapproprié" },
+  { value: "NO_RESPONSE", label: "Vendeur injoignable" },
+  { value: "OTHER", label: "Autre" },
+];
+
+interface ContactReveal {
+  contactPhone: string;
+  isOwnerNumber: boolean;
+  watermark?: string;
+}
+
+function galleryPhotos(listing: Listing): string[] {
+  const photos = [...(listing.photos ?? [])].sort((a, b) => {
+    if (a.isCover !== b.isCover) return a.isCover ? -1 : 1;
+    return a.sortOrder - b.sortOrder;
+  });
+  if (photos.length === 0) return [mediaUrl(null)];
+  return photos.map((photo) => mediaUrl(photo.url));
+}
+
+function reviewErrorMessage(err: unknown): string {
+  if (err instanceof ApiError) {
+    if (err.status === 401) return "Connectez-vous pour laisser un avis.";
+    if (err.code === "NO_CONTACT_REVEAL")
+      return "Vous devez d'abord consulter le contact du vendeur avant de laisser un avis.";
+    if (err.code === "REVIEW_TOO_EARLY")
+      return "Un délai de 24h après la consultation du contact est requis avant de laisser un avis.";
+    if (err.code === "CANNOT_REVIEW_SELF")
+      return "Vous ne pouvez pas laisser un avis sur votre propre annonce.";
+    if (err.status === 409) return "Vous avez déjà laissé un avis sur cette annonce.";
+    return err.message;
+  }
+  return "Impossible d'envoyer l'avis. Réessayez plus tard.";
+}
+
+function AdDetailContent() {
+  const { id } = useParams<{ id: string }>();
   const searchParams = useSearchParams();
-  const ad = mockAds.find((item) => item.id === id);
+  const { user } = useAuth();
+
+  const [listing, setListing] = useState<Listing | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
   const [activeImg, setActiveImg] = useState(0);
   const [zoom, setZoom] = useState({
     active: false,
@@ -23,24 +83,104 @@ export default function AdDetailPage({ params }: { params: Promise<{ id: string 
     height: 0,
   });
 
-  if (!ad) {
-    return (
-      <main className={styles.missing}>
-        <h1>Annonce introuvable</h1>
-        <Link href="/annonces" className={styles.backLink}>← Retour</Link>
-      </main>
-    );
-  }
+  // Contact
+  const [contact, setContact] = useState<ContactReveal | null>(null);
+  const [contactError, setContactError] = useState<string | null>(null);
+  const [isRevealing, setIsRevealing] = useState(false);
 
-  const categoryImages: Record<string, string[]> = {
-    Véhicules: [ad.image, "/cat_vehicules.png", "/vehicules.png"],
-    Immobilier: [ad.image, "/cat_immo.png", "/hero.PNG"],
-    Électronique: [ad.image, "/electronique.png", "/cat_pro.png"],
-    "Équipements Pro": [ad.image, "/equipements-pro.png", "/equipement-pro.png"],
-  };
-  const gallery = (categoryImages[ad.category] ?? [ad.image, ad.image, ad.image]).slice(0, 3);
+  // Avis
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [reviewStats, setReviewStats] = useState({ average: 0, count: 0 });
+  const [reviewRating, setReviewRating] = useState(0);
+  const [reviewComment, setReviewComment] = useState("");
+  const [reviewError, setReviewError] = useState<string | null>(null);
+  const [reviewSuccess, setReviewSuccess] = useState<string | null>(null);
+  const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+
+  // Signalement
+  const [showReport, setShowReport] = useState(false);
+  const [reportReason, setReportReason] = useState<ReportReason>("FRAUD");
+  const [reportDescription, setReportDescription] = useState("");
+  const [reportMessage, setReportMessage] = useState<string | null>(null);
+  const [isSubmittingReport, setIsSubmittingReport] = useState(false);
+
+  // Annonces similaires
+  const [related, setRelated] = useState<Listing[]>([]);
+
+  // Chargement de l'annonce
+  useEffect(() => {
+    if (!id) return;
+    let cancelled = false;
+    setIsLoading(true);
+    setNotFound(false);
+    setLoadError(null);
+    api
+      .get<{ listing: Listing }>(`/listings/${id}`, undefined, false)
+      .then((res) => {
+        if (cancelled) return;
+        setListing(res.data.listing);
+        setActiveImg(0);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        if (err instanceof ApiError && err.status === 404) setNotFound(true);
+        else setLoadError("Impossible de charger l'annonce. Vérifiez que le serveur est démarré.");
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
+
+  // Avis de l'annonce
+  const loadReviews = useCallback(() => {
+    if (!id) return;
+    api
+      .get<{ reviews: Review[]; stats: { average: number; count: number } }>(
+        `/reviews/listing/${id}`,
+        undefined,
+        false,
+      )
+      .then((res) => {
+        setReviews(res.data.reviews);
+        setReviewStats(res.data.stats);
+      })
+      .catch(() => {
+        // Section avis silencieuse en cas d'erreur réseau.
+      });
+  }, [id]);
+
+  useEffect(() => {
+    loadReviews();
+  }, [loadReviews]);
+
+  // Annonces similaires (même catégorie)
+  useEffect(() => {
+    if (!listing?.categoryId) return;
+    let cancelled = false;
+    api
+      .getPaginated<Listing>(
+        "/listings",
+        { categoryId: listing.categoryId, limit: 5, sort: "recent" },
+        false,
+      )
+      .then((res) => {
+        if (cancelled) return;
+        setRelated(res.data.filter((item) => item.id !== listing.id).slice(0, 4));
+      })
+      .catch(() => {
+        if (!cancelled) setRelated([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [listing?.categoryId, listing?.id]);
+
   const backHref = searchParams.get("from") === "admin-annonces" ? "/admin/annonces" : "/annonces";
-  const backLabel = searchParams.get("from") === "admin-annonces" ? "Retour admin annonces" : "Retour aux annonces";
+  const backLabel =
+    searchParams.get("from") === "admin-annonces" ? "Retour admin annonces" : "Retour aux annonces";
 
   const handleZoomMove = (event: MouseEvent<HTMLDivElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
@@ -60,6 +200,110 @@ export default function AdDetailPage({ params }: { params: Promise<{ id: string 
     });
   };
 
+  const handleRevealContact = async () => {
+    if (!listing) return;
+    setIsRevealing(true);
+    setContactError(null);
+    try {
+      const res = await api.post<ContactReveal>(`/listings/${listing.id}/contact`);
+      setContact(res.data);
+    } catch (err) {
+      if (err instanceof ApiError) {
+        if (err.status === 401) setContactError("Connectez-vous pour voir le numéro de contact.");
+        else if (err.code === "INSUFFICIENT_ROLE")
+          setContactError("La mise en relation est réservée aux comptes acheteurs.");
+        else setContactError(err.message);
+      } else {
+        setContactError("Impossible de récupérer le contact. Réessayez plus tard.");
+      }
+    } finally {
+      setIsRevealing(false);
+    }
+  };
+
+  const handleSubmitReview = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!listing) return;
+    setReviewError(null);
+    setReviewSuccess(null);
+    if (reviewRating < 1) {
+      setReviewError("Choisissez une note entre 1 et 5 étoiles.");
+      return;
+    }
+    setIsSubmittingReview(true);
+    try {
+      await api.post("/reviews", {
+        listingId: listing.id,
+        rating: reviewRating,
+        comment: reviewComment.trim() || undefined,
+      });
+      setReviewSuccess("Merci ! Votre avis a bien été enregistré.");
+      setReviewRating(0);
+      setReviewComment("");
+      loadReviews();
+    } catch (err) {
+      setReviewError(reviewErrorMessage(err));
+    } finally {
+      setIsSubmittingReview(false);
+    }
+  };
+
+  const handleSubmitReport = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!listing) return;
+    setReportMessage(null);
+    setIsSubmittingReport(true);
+    try {
+      await api.post("/reports", {
+        listingId: listing.id,
+        reason: reportReason,
+        description: reportDescription.trim() || undefined,
+      });
+      setReportMessage("Signalement envoyé. Notre équipe va l'examiner.");
+      setShowReport(false);
+      setReportDescription("");
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        setReportMessage("Connectez-vous pour signaler une annonce.");
+      } else {
+        setReportMessage(
+          err instanceof ApiError ? err.message : "Impossible d'envoyer le signalement.",
+        );
+      }
+    } finally {
+      setIsSubmittingReport(false);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <main className={styles.missing}>
+        <p>Chargement de l&apos;annonce…</p>
+      </main>
+    );
+  }
+
+  if (notFound || loadError || !listing) {
+    return (
+      <main className={styles.missing}>
+        <h1>{notFound ? "Annonce introuvable" : "Une erreur est survenue"}</h1>
+        {loadError && <p>{loadError}</p>}
+        <Link href="/annonces" className={styles.backLink}>← Retour</Link>
+      </main>
+    );
+  }
+
+  const gallery = galleryPhotos(listing);
+  const activeSrc = gallery[Math.min(activeImg, gallery.length - 1)];
+  const ownerName = listing.owner
+    ? `${listing.owner.firstName} ${listing.owner.lastName}`
+    : "Vendeur OKKAZ";
+  const ownerRole = listing.owner ? ROLE_LABELS[listing.owner.role] ?? listing.owner.role : "";
+  const periodLabel = RENTAL_PERIOD_LABELS[listing.rentalPeriod];
+  const averageStars = Math.round(reviewStats.average);
+  const isBuyer = user?.role === "BUYER";
+  const whatsappNumber = contact ? contact.contactPhone.replace(/\D/g, "") : null;
+
   return (
     <main className={styles.page}>
       <Link href={backHref} className={styles.backLink} aria-label={backLabel}>
@@ -71,11 +315,13 @@ export default function AdDetailPage({ params }: { params: Promise<{ id: string 
       <nav className={styles.breadcrumb}>
         <Link href="/">Accueil</Link>
         <span>/</span>
-        <Link href={backHref}>{searchParams.get("from") === "admin-annonces" ? "Admin annonces" : "Annonces"}</Link>
+        <Link href={backHref}>
+          {searchParams.get("from") === "admin-annonces" ? "Admin annonces" : "Annonces"}
+        </Link>
         <span>/</span>
-        <span>{ad.category}</span>
+        <span>{listing.category?.name ?? "Catégorie"}</span>
         <span>/</span>
-        <span className={styles.breadcrumbCurrent}>{ad.title}</span>
+        <span className={styles.breadcrumbCurrent}>{listing.title}</span>
       </nav>
 
       <div className={styles.layout}>
@@ -90,8 +336,8 @@ export default function AdDetailPage({ params }: { params: Promise<{ id: string 
           >
             <Image
               className={styles.galleryImage}
-              src={gallery[activeImg]}
-              alt={ad.title}
+              src={activeSrc}
+              alt={listing.title}
               fill
               priority
               sizes="(max-width: 768px) 100vw, 55vw"
@@ -110,27 +356,29 @@ export default function AdDetailPage({ params }: { params: Promise<{ id: string 
             >
               <Image
                 className={styles.imageMagnifierImg}
-                src={gallery[activeImg]}
+                src={activeSrc}
                 alt=""
                 width={1200}
                 height={960}
                 aria-hidden
               />
             </span>
-            {ad.loaPossible && <span className={styles.loaBadge}>Achat / Vente</span>}
+            {listing.isLoa && <span className={styles.loaBadge}>Achat / Vente (LOA)</span>}
           </div>
-          <div className={styles.thumbs}>
-            {gallery.map((src, i) => (
-              <button
-                key={i}
-                type="button"
-                className={`${styles.thumb} ${i === activeImg ? styles.thumbActive : ""}`}
-                onClick={() => setActiveImg(i)}
-              >
-                <Image src={src} alt={`${ad.title} ${i + 1}`} fill sizes="80px" />
-              </button>
-            ))}
-          </div>
+          {gallery.length > 1 && (
+            <div className={styles.thumbs}>
+              {gallery.map((src, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  className={`${styles.thumb} ${i === activeImg ? styles.thumbActive : ""}`}
+                  onClick={() => setActiveImg(i)}
+                >
+                  <Image src={src} alt={`${listing.title} ${i + 1}`} fill sizes="80px" />
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* ── Panel infos ── */}
@@ -138,87 +386,187 @@ export default function AdDetailPage({ params }: { params: Promise<{ id: string 
 
           <div className={styles.panelTop}>
             <div className={styles.tags}>
-              <span>{ad.category}</span>
-              <span>{ad.condition}</span>
+              <span>{listing.category?.name ?? "Catégorie"}</span>
+              <span>{CONDITION_LABELS[listing.condition]}</span>
             </div>
-            <p className={styles.ref}>Réf. {ad.reference}</p>
+            <p className={styles.ref}>
+              {listing.viewsCount} vue{listing.viewsCount > 1 ? "s" : ""}
+            </p>
           </div>
 
-          <h1 className={styles.title}>{ad.title}</h1>
+          <h1 className={styles.title}>{listing.title}</h1>
 
           <div className={styles.ratingRow}>
-            <span className={styles.stars}>★★★★★</span>
-            <span className={styles.ratingCount}>10 avis</span>
+            <span className={styles.stars}>
+              {"★".repeat(averageStars)}{"☆".repeat(5 - averageStars)}
+            </span>
+            <span className={styles.ratingCount}>
+              {reviewStats.count} avis
+            </span>
             <span className={styles.dot}>·</span>
-            <span className={styles.location}>{ad.location}</span>
+            <span className={styles.location}>
+              {listing.locationCity}
+              {listing.locationAddress ? ` — ${listing.locationAddress}` : ""}
+            </span>
           </div>
 
           <div className={styles.priceBlock}>
-            <strong className={styles.price}>{ad.price.toLocaleString("fr-FR")} FCFA</strong>
-            <span className={styles.pricePer}>/mois</span>
-            {ad.totalPrice && (
-              <span className={styles.totalPrice}>Prix total : {ad.totalPrice.toLocaleString("fr-FR")} FCFA</span>
+            <strong className={styles.price}>{formatPrice(listing.rentalPrice)}</strong>
+            <span className={styles.pricePer}>/{periodLabel}</span>
+            {listing.purchasePrice != null && (
+              <span className={styles.totalPrice}>
+                Prix d&apos;achat : {formatPrice(listing.purchasePrice)}
+              </span>
             )}
           </div>
 
           <div className={styles.divider} />
 
-          <div className={styles.optionRow}>
-            <p className={styles.optionLabel}>Durée</p>
-            <div className={styles.optionBtns}>
-              <button type="button" className={styles.optionBtnActive}>{ad.minimumDuration}</button>
-              {ad.loaPossible && <button type="button" className={styles.optionBtn}>Achat / Vente — {ad.loaDuration}</button>}
-              <button type="button" className={styles.optionBtn}>Sur mesure</button>
-            </div>
-          </div>
-
           <div className={styles.infoGrid}>
             <div className={styles.infoItem}>
-              <span>Caution</span>
-              <strong>{ad.deposit.toLocaleString("fr-FR")} FCFA</strong>
+              <span>État</span>
+              <strong>{CONDITION_LABELS[listing.condition]}</strong>
+            </div>
+            <div className={styles.infoItem}>
+              <span>Ville</span>
+              <strong>{listing.locationCity}</strong>
+            </div>
+            <div className={styles.infoItem}>
+              <span>Formule</span>
+              <strong>
+                {listing.isLoa
+                  ? `Location avec option d'achat${listing.loaDurationMonths ? ` (${listing.loaDurationMonths} mois)` : ""}`
+                  : "Location"}
+              </strong>
+            </div>
+            <div className={styles.infoItem}>
+              <span>Mises en relation</span>
+              <strong>{listing.contactsCount}</strong>
             </div>
           </div>
 
-          <div className={styles.contactBlock}>
-            <p className={styles.contactPhoneLabel}>
-              {ad.directNumber ? "📞 Numéro direct du vendeur" : "📞 Numéro intermédiaire OKKAZ"}
+          {/* ── Contact ── */}
+          {!user ? (
+            <>
+              <div className={styles.actions}>
+                <Link href="/connexion" className={styles.btnPrimary} style={{ width: "100%" }}>
+                  Se connecter pour voir le contact
+                </Link>
+              </div>
+              <p className={styles.lockedContact}>
+                Connectez-vous avec un compte acheteur pour afficher le numéro de mise en relation.
+              </p>
+            </>
+          ) : !isBuyer ? (
+            <p className={styles.lockedContact}>
+              La mise en relation est réservée aux comptes acheteurs.
             </p>
-            <div className={styles.phoneBox}>
-              <strong>{ad.directNumber ? ad.ownerPhone : "+229 01 00 00 00 00"}</strong>
-            </div>
-          </div>
-
-          <div className={styles.actions}>
-            <a
-              href={`https://wa.me/${(ad.directNumber ? ad.ownerPhone : "+229 01 00 00 00 00").replace(/\D/g, "")}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={styles.btnPrimary}
-              style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", minHeight: "3.2rem", borderRadius: "12px", textDecoration: "none", fontWeight: 760 }}
-            >
-              Contacter sur WhatsApp
-            </a>
-          </div>
-
-          <p className={styles.lockedContact}>
-            {ad.directNumber ? (
-              "Ce vendeur a payé l'option Premium pour afficher son numéro direct."
-            ) : (
-              "Numéro intermédiaire OKKAZ affiché. OKKAZ sécurise la mise en relation et la transaction."
-            )}
-          </p>
-
-          <div className={styles.verifiedRow}>
-            <span className={styles.verifiedDot} />
-            <span>{ad.verifiedAt}</span>
-          </div>
+          ) : contact ? (
+            <>
+              <div className={styles.contactBlock}>
+                <p className={styles.contactPhoneLabel}>
+                  {contact.isOwnerNumber
+                    ? "📞 Numéro direct du vendeur"
+                    : "📞 Numéro de mise en relation OKKAZ"}
+                </p>
+                <div className={styles.phoneBox}>
+                  <strong>{contact.contactPhone}</strong>
+                </div>
+              </div>
+              <div className={styles.actions}>
+                <a
+                  href={`https://wa.me/${whatsappNumber}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={styles.btnPrimary}
+                  style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", minHeight: "3.2rem", borderRadius: "12px", textDecoration: "none", fontWeight: 760, width: "100%" }}
+                >
+                  Contacter sur WhatsApp
+                </a>
+              </div>
+              {!contact.isOwnerNumber && (
+                <p className={styles.lockedContact}>
+                  Ce numéro est le numéro de mise en relation OKKAZ : la plateforme sécurise
+                  l&apos;échange avec le vendeur.
+                </p>
+              )}
+            </>
+          ) : (
+            <>
+              <div className={styles.actions}>
+                <button
+                  type="button"
+                  className={styles.btnPrimary}
+                  style={{ width: "100%", border: "none", cursor: "pointer", font: "inherit", fontWeight: 760 }}
+                  onClick={handleRevealContact}
+                  disabled={isRevealing}
+                >
+                  {isRevealing ? "Récupération du contact…" : "Afficher le numéro de contact"}
+                </button>
+              </div>
+              <p className={styles.lockedContact}>
+                OKKAZ affiche un numéro de mise en relation pour sécuriser les échanges.
+              </p>
+            </>
+          )}
+          {contactError && <p className={styles.formError}>{contactError}</p>}
 
           <div className={styles.sellerRow}>
-            <div className={styles.sellerAvatar}>{ad.owner[0]}</div>
+            <div className={styles.sellerAvatar}>{ownerName[0]}</div>
             <div>
-              <p className={styles.sellerName}>{ad.owner}</p>
-              <p className={styles.sellerMeta}>{ad.ownerType} · {ad.ownerResponseTime}</p>
+              <p className={styles.sellerName}>{ownerName}</p>
+              <p className={styles.sellerMeta}>
+                {ownerRole}
+                {listing.owner?.city ? ` · ${listing.owner.city}` : ""}
+              </p>
             </div>
+          </div>
+
+          {/* ── Signalement ── */}
+          <div>
+            <button
+              type="button"
+              className={styles.reportToggle}
+              onClick={() => {
+                setShowReport((current) => !current);
+                setReportMessage(null);
+              }}
+            >
+              🚩 Signaler cette annonce
+            </button>
+            {showReport && (
+              user ? (
+                <form className={styles.reportForm} onSubmit={handleSubmitReport}>
+                  <label>
+                    Motif
+                    <select
+                      value={reportReason}
+                      onChange={(event) => setReportReason(event.target.value as ReportReason)}
+                    >
+                      {REPORT_REASONS.map((reason) => (
+                        <option key={reason.value} value={reason.value}>
+                          {reason.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <textarea
+                    rows={2}
+                    placeholder="Précisez le problème (optionnel)"
+                    value={reportDescription}
+                    onChange={(event) => setReportDescription(event.target.value)}
+                  />
+                  <button type="submit" disabled={isSubmittingReport}>
+                    {isSubmittingReport ? "Envoi…" : "Envoyer le signalement"}
+                  </button>
+                </form>
+              ) : (
+                <p className={styles.lockedContact}>
+                  <Link href="/connexion">Connectez-vous</Link> pour signaler cette annonce.
+                </p>
+              )
+            )}
+            {reportMessage && <p className={styles.formInfo}>{reportMessage}</p>}
           </div>
 
         </aside>
@@ -229,83 +577,138 @@ export default function AdDetailPage({ params }: { params: Promise<{ id: string 
 
         <section className={styles.detailBlock}>
           <h2>Description</h2>
-          <p>{ad.description}</p>
+          <p>{listing.description}</p>
         </section>
 
-        {/* Avis vendeur */}
+        {/* Avis */}
         <section className={styles.reviewsSection}>
-          <h2 className={styles.sectionTitle}>Avis sur le vendeur</h2>
+          <h2 className={styles.sectionTitle}>Avis sur cette annonce</h2>
           <div className={styles.sellerReviewHeader}>
-            <div className={styles.sellerReviewAvatar}>{ad.owner[0]}</div>
+            <div className={styles.sellerReviewAvatar}>{ownerName[0]}</div>
             <div>
-              <p className={styles.sellerReviewName}>{ad.owner}</p>
-              <p className={styles.sellerReviewMeta}>{ad.ownerType}</p>
+              <p className={styles.sellerReviewName}>{ownerName}</p>
+              <p className={styles.sellerReviewMeta}>{ownerRole}</p>
             </div>
             <div className={styles.sellerScore}>
-              <strong>4.8</strong>
-              <span>★★★★★</span>
-              <span className={styles.sellerScoreCount}>10 avis</span>
+              <strong>{reviewStats.count > 0 ? reviewStats.average.toFixed(1) : "—"}</strong>
+              <span>{"★".repeat(averageStars)}{"☆".repeat(5 - averageStars)}</span>
+              <span className={styles.sellerScoreCount}>{reviewStats.count} avis</span>
             </div>
-          </div>
-          <div className={styles.reviewsList}>
-            {[
-              { name: "Kofi A.", note: "Vendeur très réactif, article conforme à l'annonce.", stars: 5 },
-              { name: "Mariama D.", note: "Bonne expérience, livraison rapide et bien emballé.", stars: 5 },
-              { name: "Sènan B.", note: "Professionnel et honnête, je recommande.", stars: 4 },
-            ].map((review) => (
-              <div key={review.name} className={styles.reviewItem}>
-                <div className={styles.reviewTop}>
-                  <span className={styles.reviewName}>{review.name}</span>
-                  <span className={styles.reviewStars}>{"★".repeat(review.stars)}{"☆".repeat(5 - review.stars)}</span>
-                </div>
-                <p className={styles.reviewText}>{review.note}</p>
-              </div>
-            ))}
           </div>
 
-          <form className={styles.reviewForm} onSubmit={(e) => e.preventDefault()}>
-            <p className={styles.reviewFormTitle}>Laisser un avis</p>
-            <div className={styles.reviewFormStars}>
-              {[1,2,3,4,5].map((s) => (
-                <button key={s} type="button" className={styles.starBtn}>☆</button>
+          {reviews.length === 0 ? (
+            <p className={styles.reviewText}>Aucun avis pour le moment.</p>
+          ) : (
+            <div className={styles.reviewsList}>
+              {reviews.map((review) => (
+                <div key={review.id} className={styles.reviewItem}>
+                  <div className={styles.reviewTop}>
+                    <span className={styles.reviewName}>
+                      {review.reviewer
+                        ? `${review.reviewer.firstName} ${review.reviewer.lastName}`
+                        : "Utilisateur OKKAZ"}
+                    </span>
+                    <span className={styles.reviewStars}>
+                      {"★".repeat(review.rating)}{"☆".repeat(5 - review.rating)}
+                    </span>
+                  </div>
+                  {review.comment && <p className={styles.reviewText}>{review.comment}</p>}
+                </div>
               ))}
             </div>
-            <textarea className={styles.reviewTextarea} placeholder="Votre avis sur le vendeur..." rows={3} />
-            <button type="submit" className={styles.reviewSubmit}>Publier l&apos;avis</button>
-          </form>
+          )}
+
+          {user ? (
+            <form className={styles.reviewForm} onSubmit={handleSubmitReview}>
+              <p className={styles.reviewFormTitle}>Laisser un avis</p>
+              <div className={styles.reviewFormStars}>
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <button
+                    key={star}
+                    type="button"
+                    className={styles.starBtn}
+                    aria-label={`${star} étoile${star > 1 ? "s" : ""}`}
+                    onClick={() => setReviewRating(star)}
+                  >
+                    {star <= reviewRating ? "★" : "☆"}
+                  </button>
+                ))}
+              </div>
+              <textarea
+                className={styles.reviewTextarea}
+                placeholder="Votre avis sur cette annonce..."
+                rows={3}
+                value={reviewComment}
+                onChange={(event) => setReviewComment(event.target.value)}
+              />
+              {reviewError && <p className={styles.formError}>{reviewError}</p>}
+              {reviewSuccess && <p className={styles.formInfo}>{reviewSuccess}</p>}
+              <button type="submit" className={styles.reviewSubmit} disabled={isSubmittingReview}>
+                {isSubmittingReview ? "Envoi…" : "Publier l'avis"}
+              </button>
+            </form>
+          ) : (
+            <p className={styles.reviewText}>
+              <Link href="/connexion">Connectez-vous</Link> pour laisser un avis.
+            </p>
+          )}
         </section>
 
         {/* Dans la même catégorie */}
-        <section className={styles.relatedSection}>
-          <h2 className={styles.sectionTitle}>Dans la même catégorie</h2>
-          <div className={styles.relatedGrid}>
-            {(mockAds.filter((a) => a.category === ad.category && a.id !== ad.id).length > 0
-              ? mockAds.filter((a) => a.category === ad.category && a.id !== ad.id)
-              : mockAds.filter((a) => a.id !== ad.id).slice(0, 3)
-            ).map((a, index) => (
-              <Link
-                href={`/annonces/${a.id}`}
-                key={a.id}
-                className={`${styles.card} ${index % 2 === 0 ? styles.darkCard : styles.lightCard}`}
-              >
-                <div className={styles.cardImageWrap}>
-                  <Image src={a.image} alt={a.title} fill sizes="(max-width: 900px) 90vw, 25vw" />
-                </div>
-                <div className={styles.cardBody}>
-                  <div className={styles.cardTop}>
-                    <span>{a.category}</span>
-                    <span>{a.loaPossible ? "Achat / Vente" : "Location"}</span>
-                  </div>
-                  <h2>{a.title}</h2>
-                  <strong className={styles.cardPrice}>{a.price.toLocaleString("fr-FR")} FCFA / mois</strong>
-                </div>
-              </Link>
-            ))}
-          </div>
-        </section>
+        {related.length > 0 && (
+          <section className={styles.relatedSection}>
+            <h2 className={styles.sectionTitle}>Dans la même catégorie</h2>
+            <div className={styles.relatedGrid}>
+              {related.map((item, index) => {
+                const photos = item.photos ?? [];
+                const cover = photos.find((photo) => photo.isCover) ?? photos[0];
+                return (
+                  <Link
+                    href={`/annonces/${item.id}`}
+                    key={item.id}
+                    className={`${styles.card} ${index % 2 === 0 ? styles.darkCard : styles.lightCard}`}
+                  >
+                    <div className={styles.cardImageWrap}>
+                      <Image
+                        src={mediaUrl(cover?.url)}
+                        alt={item.title}
+                        fill
+                        sizes="(max-width: 900px) 90vw, 25vw"
+                      />
+                    </div>
+                    <div className={styles.cardBody}>
+                      <div className={styles.cardTop}>
+                        <span>{item.category?.name ?? "Annonce"}</span>
+                        <span>{item.isLoa ? "Achat / Vente" : "Location"}</span>
+                      </div>
+                      <h2>{item.title}</h2>
+                      <strong className={styles.cardPrice}>
+                        {formatPrice(item.rentalPrice)} / {RENTAL_PERIOD_LABELS[item.rentalPeriod]}
+                      </strong>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          </section>
+        )}
 
       </div>
 
     </main>
+  );
+}
+
+export default function AdDetailPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className={styles.missing}>
+          <p>Chargement de l&apos;annonce…</p>
+        </main>
+      }
+    >
+      <AdDetailContent />
+    </Suspense>
   );
 }
