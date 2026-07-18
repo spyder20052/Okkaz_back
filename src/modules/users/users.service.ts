@@ -75,6 +75,14 @@ export async function changePassword(userId: string, currentPassword: string, ne
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) throw AppError.notFound('USER_NOT_FOUND', 'Utilisateur introuvable.');
 
+  // Compte créé via Google : pas de mot de passe local à changer.
+  if (!user.passwordHash) {
+    throw AppError.badRequest(
+      'PASSWORD_NOT_SET',
+      'Ce compte utilise la connexion Google et n\'a pas de mot de passe local.',
+    );
+  }
+
   const ok = await bcrypt.compare(currentPassword, user.passwordHash);
   if (!ok) throw AppError.badRequest('INVALID_CURRENT_PASSWORD', 'Mot de passe actuel invalide.');
 

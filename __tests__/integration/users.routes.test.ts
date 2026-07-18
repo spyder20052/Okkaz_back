@@ -132,19 +132,20 @@ describe('Users Routes (Integration)', () => {
       expect(Array.isArray(res.body.data)).toBe(true);
     });
 
-    it('SELLER ne doit pas accéder aux contact-accesses (BUYER only)', async () => {
+    it('SELLER doit accéder aux contact-reveals (vendeur = aussi consommateur)', async () => {
       const res = await request(app)
-        .get('/api/v1/users/me/contact-accesses')
+        .get('/api/v1/users/me/contact-reveals')
         .set('Authorization', `Bearer ${validSellerToken}`);
-      
-      expect(res.status).toBe(403);
+
+      expect(res.status).toBe(200);
+      expect(Array.isArray(res.body.data)).toBe(true);
     });
 
-    it('BUYER doit accéder aux contact-accesses', async () => {
+    it('BUYER doit accéder aux contact-reveals', async () => {
       const res = await request(app)
-        .get('/api/v1/users/me/contact-accesses')
+        .get('/api/v1/users/me/contact-reveals')
         .set('Authorization', `Bearer ${validBuyerToken}`);
-      
+
       expect(res.status).toBe(200);
       expect(Array.isArray(res.body.data)).toBe(true);
     });

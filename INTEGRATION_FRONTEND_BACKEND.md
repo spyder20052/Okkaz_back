@@ -122,8 +122,8 @@ Seul l'abonnement Premium (`isFeatured=true` sur **toutes** les annonces du vend
 **4. Aucune réservation / paiement de location.**
 Le flux par défaut de `/paiement` (payer une location avec caution, dates, etc.) n'a **aucun** équivalent backend : pas de modèle Booking, pas de calendrier, pas de paiement de location. L'UI affiche « non disponible ». *Gros morceau produit à cadrer si nécessaire (cahier des charges le mentionne).*
 
-**5. Pas d'OAuth Google/Apple.**
-La page connexion du front n'avait QUE deux boutons factices « Sign in with Google/Apple ». Le backend fait de l'auth email/téléphone + mot de passe (JWT). La page a été refondue en vrais formulaires. *Si l'OAuth est souhaité, c'est un chantier backend (Passport/OIDC).*
+**5. ~~Pas d'OAuth Google/Apple~~ — ✅ Google RÉSOLU (19 juil. 2026), Apple en attente.**
+`POST /auth/oauth/google` est implémenté : le front envoie l'ID token Google Identity Services, le backend le vérifie (audience + signature via l'endpoint officiel Google), crée un compte BUYER actif au premier login (sans téléphone ni mot de passe — schéma migré) ou lie le compte Google à un compte existant portant le même email. Il reste à créer un **Client ID OAuth** sur console.cloud.google.com et à le renseigner dans `GOOGLE_CLIENT_ID` (backend) + `NEXT_PUBLIC_GOOGLE_CLIENT_ID` (front) — sans quoi le bouton front passe en mode simulation et le serveur répond 503 `OAUTH_NOT_CONFIGURED`. **Sign in with Apple reste non implémenté** : il exige un compte Apple Developer payant (99 $/an, Services ID + clé privée) — décision à prendre avant tout développement.
 
 ### B. Fonctionnalités front sans aucun backend (UI présente, API absente)
 
@@ -151,7 +151,7 @@ La page connexion du front n'avait QUE deux boutons factices « Sign in with Goo
 | 20 | `GET /auth/verify-email/:token` | Page de confirmation d'email (le lien du mail pointe actuellement vers l'API brute) |
 | 21 | `GET /demands`, `GET /demands/standard`, `GET /demands/:id`, `PATCH /demands/:id/close` | **Liste des demandes « Je recherche » pour que les vendeurs y répondent** (les EXPRESS sont réservées aux SELLER_PRO) — c'est le cœur du produit demandes, aucune page ne l'affiche |
 | 22 | `GET /users/:id/public` | Page profil public d'un vendeur (note moyenne, annonces actives) |
-| 23 | `GET /users/me/contact-reveals`, `GET /users/me/payments` | Espace acheteur : historique des contacts consultés et des paiements |
+| 23 | `GET /users/me/contact-reveals` (ouvert à BUYER/SELLER/SELLER_PRO depuis le 19 juil.), `GET /users/me/payments` | Espace acheteur : historique des contacts consultés et des paiements |
 | 24 | `PATCH /reviews/:id/moderate`, `DELETE /reviews/:id` | UI admin de modération des avis (note visible ajoutée sur /admin/moderation) |
 | 25 | Filtres API non exposés : `city`, `minPrice`/`maxPrice` sur /listings ; `method`, `dateFrom/dateTo` sur /admin/payments ; `kycStatus` sur /admin/users | Ajouter les contrôles UI correspondants (facile) |
 

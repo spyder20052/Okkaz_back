@@ -55,6 +55,11 @@ export const refreshTokenSchema = z.object({
   refreshToken: z.string().min(1),
 });
 
+/** Schéma du body pour `POST /auth/oauth/google` (ID token Google Identity Services). */
+export const googleAuthSchema = z.object({
+  idToken: z.string().min(10, 'ID token Google requis.'),
+});
+
 /** Schéma du body pour `POST /auth/forgot-password`. */
 export const forgotPasswordSchema = z.object({
   email: z.string().email().toLowerCase(),

@@ -23,6 +23,8 @@ const envSchema = z.object({
     .transform((value) => value.split(",").map((origin) => origin.trim()))
     .pipe(z.array(z.string().url()).min(1)),
   API_PREFIX: z.string().startsWith("/").default("/api/v1"),
+  // OAuth Google (Sign in with Google) — vide = fonctionnalité désactivée.
+  GOOGLE_CLIENT_ID: z.string().optional(),
 
   // DB
   DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),

@@ -8,6 +8,7 @@
 
 import bcrypt from "bcrypt";
 import { UserRole, UserStatus } from "@prisma/client";
+import { env } from "../../config/env";
 import { prisma } from "../../config/prisma";
 import { logger } from "../../config/logger";
 import { AppError } from "../../utils/AppError";
@@ -36,7 +37,7 @@ interface AuthTokens {
 interface PublicUser {
   id: string;
   email: string;
-  phone: string;
+  phone: string | null;
   firstName: string;
   lastName: string;
   role: UserRole;
@@ -54,7 +55,7 @@ interface PublicUser {
 function toPublicUser(u: {
   id: string;
   email: string;
-  phone: string;
+  phone: string | null;
   firstName: string;
   lastName: string;
   role: UserRole;
@@ -178,6 +179,14 @@ export async function login(
     throw AppError.forbidden("ACCOUNT_BLOCKED", "Ce compte est bloqué.");
   }
 
+  // Compte créé via Google : pas de mot de passe local.
+  if (!user.passwordHash) {
+    throw AppError.unauthorized(
+      "PASSWORD_NOT_SET",
+      "Ce compte utilise la connexion Google. Utilisez « Continuer avec Google ».",
+    );
+  }
+
   const ok = await bcrypt.compare(input.password, user.passwordHash);
   if (!ok)
     throw AppError.unauthorized(
@@ -191,6 +200,115 @@ export async function login(
   });
 
   logger.info({ userId: user.id }, "🟡 User login");
+  const tokens = await issueTokens(user.id, user.role);
+  return { user: toPublicUser(user), tokens };
+}
+
+/** Payload utile renvoyé par l'endpoint tokeninfo de Google. */
+interface GoogleTokenInfo {
+  aud: string;
+  sub: string;
+  email?: string;
+  email_verified?: string; // "true" | "false"
+  given_name?: string;
+  family_name?: string;
+  picture?: string;
+}
+
+/**
+ * Vérifie un ID token Google via l'endpoint officiel `tokeninfo`
+ * (Google valide la signature ; on contrôle l'audience et l'email).
+ *
+ * @param idToken - ID token émis par Google Identity Services côté client.
+ * @returns Les informations du compte Google.
+ * @throws {AppError} 503 si `GOOGLE_CLIENT_ID` n'est pas configuré.
+ * @throws {AppError} 401 si le token est invalide ou destiné à une autre app.
+ * @private
+ */
+async function verifyGoogleIdToken(idToken: string): Promise<GoogleTokenInfo> {
+  if (!env.GOOGLE_CLIENT_ID) {
+    throw new AppError(
+      503,
+      "OAUTH_NOT_CONFIGURED",
+      "La connexion Google n'est pas configurée sur ce serveur.",
+    );
+  }
+  const res = await fetch(
+    `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(idToken)}`,
+  );
+  if (!res.ok) {
+    throw AppError.unauthorized(
+      "GOOGLE_TOKEN_INVALID",
+      "Jeton Google invalide ou expiré.",
+    );
+  }
+  const info = (await res.json()) as GoogleTokenInfo;
+  if (info.aud !== env.GOOGLE_CLIENT_ID || !info.sub || !info.email) {
+    throw AppError.unauthorized(
+      "GOOGLE_TOKEN_INVALID",
+      "Jeton Google invalide (audience ou email manquant).",
+    );
+  }
+  return info;
+}
+
+/**
+ * Connexion / inscription via Google (Sign in with Google).
+ *
+ * - Compte trouvé par `googleId` ou par email → connexion (liaison du
+ *   `googleId` si première connexion Google sur un compte classique).
+ * - Aucun compte → création d'un BUYER actif, sans mot de passe ni téléphone.
+ *
+ * @param idToken - ID token Google Identity Services.
+ * @returns `{ user, tokens }`.
+ * @throws {AppError} 401/503 via {@link verifyGoogleIdToken}, 403 si compte bloqué.
+ */
+export async function loginWithGoogle(
+  idToken: string,
+): Promise<{ user: PublicUser; tokens: AuthTokens }> {
+  const info = await verifyGoogleIdToken(idToken);
+  const email = String(info.email).toLowerCase();
+
+  let user = await prisma.user.findFirst({
+    where: { OR: [{ googleId: info.sub }, { email }], deletedAt: null },
+  });
+
+  if (user?.status === UserStatus.BLOCKED) {
+    throw AppError.forbidden("ACCOUNT_BLOCKED", "Ce compte est bloqué.");
+  }
+
+  if (!user) {
+    user = await prisma.user.create({
+      data: {
+        email,
+        googleId: info.sub,
+        firstName: info.given_name ?? "Utilisateur",
+        lastName: info.family_name ?? "Google",
+        role: UserRole.BUYER,
+        status: UserStatus.ACTIVE,
+        isEmailVerified: info.email_verified === "true",
+        profilePhotoUrl: info.picture ?? null,
+      },
+    });
+    logger.info({ userId: user.id }, "🟡 User registered via Google");
+  } else if (!user.googleId) {
+    // Compte classique existant avec le même email : liaison du compte Google.
+    user = await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        googleId: info.sub,
+        isEmailVerified: user.isEmailVerified || info.email_verified === "true",
+      },
+    });
+    logger.info({ userId: user.id }, "🟡 Google account linked");
+  }
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { lastLoginAt: new Date() },
+  });
+
+  logger.info({ userId: user.id }, "🟡 User login via Google");
   const tokens = await issueTokens(user.id, user.role);
   return { user: toPublicUser(user), tokens };
 }

@@ -31,6 +31,17 @@ export async function login(req: Request, res: Response): Promise<Response> {
 }
 
 /**
+ * `POST /auth/oauth/google` — Connexion / inscription via Google.
+ *
+ * @param req - Body : `{ idToken }` (ID token Google Identity Services).
+ * @param res - 200 OK avec `{ user, tokens }`.
+ */
+export async function googleAuth(req: Request, res: Response): Promise<Response> {
+  const result = await authService.loginWithGoogle(req.body.idToken);
+  return sendSuccess(res, result, 'Connexion Google réussie.');
+}
+
+/**
  * `POST /auth/refresh` — Renouvellement des tokens (rotation sécurisée).
  *
  * @param req - Body : `{ refreshToken }`.

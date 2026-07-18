@@ -28,6 +28,13 @@ router.post(
 );
 
 router.post(
+  '/oauth/google',
+  authLimiter,
+  validateRequest({ body: schemas.googleAuthSchema }),
+  asyncHandler(controller.googleAuth),
+);
+
+router.post(
   '/refresh-token',
   validateRequest({ body: schemas.refreshTokenSchema }),
   asyncHandler(controller.refresh),
