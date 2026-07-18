@@ -2,7 +2,7 @@
 
 // Contexte d'authentification global.
 // Source de vérité: localStorage (clé okkaz_auth) + événement okkaz-auth-updated,
-// même pattern que platformEvents.ts / searchRequests.ts.
+// synchronisée entre les onglets via les événements navigateur.
 
 import {
   createContext,
@@ -45,9 +45,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const sync = () => setUser(readAuth()?.user ?? null);
-    sync();
-    setIsLoading(false);
+    const sync = () => {
+      const auth = readAuth();
+      setUser(auth?.user ?? null);
+      if (auth) {
+        document.cookie = `okkaz_session_role=${encodeURIComponent(auth.user.role)}; Path=/; Max-Age=2592000; SameSite=Lax`;
+      }
+    };
+    queueMicrotask(() => {
+      sync();
+      setIsLoading(false);
+    });
     window.addEventListener(AUTH_UPDATED_EVENT, sync);
     window.addEventListener("storage", sync);
     return () => {

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { api, ApiError } from "@/lib/api";
-import type { Report, ReportReason } from "@/lib/types";
+import type { Report, ReportReason, Review } from "@/lib/types";
 import AdminShell from "../AdminShell";
 import styles from "../admin.module.css";
 
@@ -31,6 +31,10 @@ export default function AdminModerationPage() {
   const [loading, setLoading] = useState(true);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [actingId, setActingId] = useState<string | null>(null);
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [reviewsFeedback, setReviewsFeedback] = useState<string | null>(null);
+  const [reviewListingId, setReviewListingId] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -53,6 +57,46 @@ export default function AdminModerationPage() {
     const timer = setTimeout(() => void load(), 0);
     return () => clearTimeout(timer);
   }, [load]);
+
+  const loadReviewsForListing = async (selectedListingId?: string) => {
+    const listingId = (selectedListingId ?? reviewListingId).trim();
+    if (!listingId) {
+      setReviewsFeedback("Saisissez l’identifiant complet d’une annonce.");
+      return;
+    }
+    setReviewListingId(listingId);
+    setReviewsLoading(true);
+    setReviewsFeedback(null);
+    try {
+      const res = await api.get<{ reviews: Review[] }>(`/reviews/listing/${encodeURIComponent(listingId)}`);
+      setReviews(res.data.reviews);
+      if (res.data.reviews.length === 0) setReviewsFeedback("Cette annonce ne contient aucun avis visible.");
+    } catch (err) {
+      setReviews([]);
+      setReviewsFeedback(err instanceof ApiError ? err.message : "Impossible de charger les avis.");
+    } finally {
+      setReviewsLoading(false);
+    }
+  };
+
+  const moderateReview = async (review: Review) => {
+    setActingId(review.id); setReviewsFeedback(null);
+    try {
+      await api.patch(`/reviews/${review.id}/moderate`, { isModerated: !review.isModerated });
+      setReviews((items) => items.map((item) => item.id === review.id ? { ...item, isModerated: !item.isModerated } : item));
+    } catch (err) { setReviewsFeedback(err instanceof ApiError ? err.message : "Modération impossible."); }
+    finally { setActingId(null); }
+  };
+
+  const deleteReview = async (review: Review) => {
+    if (!confirm("Supprimer définitivement cet avis ?")) return;
+    setActingId(review.id); setReviewsFeedback(null);
+    try {
+      await api.delete(`/reviews/${review.id}`);
+      setReviews((items) => items.filter((item) => item.id !== review.id));
+    } catch (err) { setReviewsFeedback(err instanceof ApiError ? err.message : "Suppression impossible."); }
+    finally { setActingId(null); }
+  };
 
   const review = async (report: Report, status: "REVIEWED" | "CLOSED") => {
     let adminNote: string | undefined;
@@ -85,21 +129,6 @@ export default function AdminModerationPage() {
           </div>
           <div className={styles.avatar}>M</div>
         </header>
-
-        <p
-          style={{
-            margin: "12px 0",
-            padding: "10px 14px",
-            borderRadius: 12,
-            background: "rgba(234, 179, 8, 0.12)",
-            color: "#92400e",
-            fontWeight: 700,
-            fontSize: "0.84rem",
-          }}
-        >
-          Note : la modération des AVIS (PATCH /reviews/:id/moderate, DELETE /reviews/:id)
-          existe côté backend mais n&apos;a pas encore d&apos;interface ici.
-        </p>
 
         <div className={styles.adminFilterBar}>
           {(Object.keys(STATUS_LABELS) as ReportStatus[]).map((s) => (
@@ -155,6 +184,15 @@ export default function AdminModerationPage() {
                   </div>
                   {filter !== "CLOSED" ? (
                     <div style={{ display: "grid", gap: 6 }}>
+                      {report.listing ? (
+                        <button
+                          type="button"
+                          disabled={reviewsLoading}
+                          onClick={() => void loadReviewsForListing(report.listing?.id)}
+                        >
+                          Voir les avis
+                        </button>
+                      ) : null}
                       {filter === "OPEN" ? (
                         <button
                           type="button"
@@ -203,6 +241,33 @@ export default function AdminModerationPage() {
               </button>
             </div>
           ) : null}
+        </article>
+        <article className={styles.card}>
+          <div className={styles.cardHeader}><div><h2>Modération des avis</h2><p>Recherchez les avis à partir de l’identifiant d’une annonce.</p></div></div>
+          <div className={styles.adminFilterBar}>
+            <label className={styles.adminSearchInline}>
+              <input
+                type="text"
+                value={reviewListingId}
+                onChange={(event) => setReviewListingId(event.target.value)}
+                placeholder="Identifiant complet de l’annonce"
+              />
+            </label>
+            <button type="button" className={styles.adminFilterPill} onClick={() => void loadReviewsForListing()}>
+              Charger les avis
+            </button>
+          </div>
+          {reviewsFeedback && <p className={styles.adminModerationEmpty}>{reviewsFeedback}</p>}
+          {reviewsLoading ? <p className={styles.adminModerationEmpty}>Chargement des avis…</p> :
+            reviews.length === 0 ? <p className={styles.adminModerationEmpty}>Saisissez une annonce pour afficher ses avis.</p> :
+            <div className={styles.actionList}>{reviews.map((review) => <div className={styles.actionItem} key={review.id}>
+              <span>{review.rating}/5</span>
+              <div><strong>{review.reviewer ? `${review.reviewer.firstName} ${review.reviewer.lastName}` : "Utilisateur"}</strong><p>{review.comment || "Sans commentaire"} · {review.isModerated ? "Masqué" : "Visible"}</p></div>
+              <div style={{ display: "grid", gap: 6 }}>
+                <button disabled={actingId === review.id} onClick={() => void moderateReview(review)}>{review.isModerated ? "Rendre visible" : "Masquer"}</button>
+                <button disabled={actingId === review.id} onClick={() => void deleteReview(review)}>Supprimer</button>
+              </div>
+            </div>)}</div>}
         </article>
       </section>
     </AdminShell>

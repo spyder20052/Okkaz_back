@@ -78,6 +78,9 @@ export default function AdminPaiementsPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [typeFilter, setTypeFilter] = useState<PaymentType | "">("");
   const [statusFilter, setStatusFilter] = useState<PaymentStatus | "">("");
+  const [methodFilter, setMethodFilter] = useState<Payment["method"] | "">("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [feedback, setFeedback] = useState<string | null>(null);
@@ -88,6 +91,9 @@ export default function AdminPaiementsPage() {
       const res = await api.getPaginated<Payment>("/admin/payments", {
         type: typeFilter || undefined,
         status: statusFilter || undefined,
+        method: methodFilter || undefined,
+        dateFrom: dateFrom || undefined,
+        dateTo: dateTo || undefined,
         page,
         limit: 15,
       });
@@ -98,7 +104,7 @@ export default function AdminPaiementsPage() {
     } finally {
       setLoading(false);
     }
-  }, [typeFilter, statusFilter, page]);
+  }, [typeFilter, statusFilter, methodFilter, dateFrom, dateTo, page]);
 
   useEffect(() => {
     const timer = setTimeout(() => void load(), 0);
@@ -160,6 +166,13 @@ export default function AdminPaiementsPage() {
           </div>
         </div>
 
+        <div className={styles.adminFilterBar}>
+          <button type="button" className={`${styles.adminFilterPill} ${methodFilter === "" ? styles.adminFilterPillActive : ""}`} onClick={() => { setMethodFilter(""); setPage(1); }}>Toutes méthodes</button>
+          <button type="button" className={`${styles.adminFilterPill} ${methodFilter === "MOBILE_MONEY" ? styles.adminFilterPillActive : ""}`} onClick={() => { setMethodFilter("MOBILE_MONEY"); setPage(1); }}>Mobile Money</button>
+          <button type="button" className={`${styles.adminFilterPill} ${methodFilter === "CARD" ? styles.adminFilterPillActive : ""}`} onClick={() => { setMethodFilter("CARD"); setPage(1); }}>Carte</button>
+          <label>Du <input type="date" value={dateFrom} onChange={(e) => { setDateFrom(e.target.value); setPage(1); }} /></label>
+          <label>Au <input type="date" value={dateTo} onChange={(e) => { setDateTo(e.target.value); setPage(1); }} /></label>
+        </div>
         <div className={styles.adminFilterBar}>
           <button
             type="button"

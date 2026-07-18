@@ -350,7 +350,7 @@ route("GET", "users/me/listings", (ctx) => {
   paginate(ctx.res, items, ctx.query);
 });
 route("GET", "users/me/contact-reveals", (ctx) => {
-  const user = requireAuth(ctx.req, ctx.res, ["BUYER"]); if (!user) return;
+  const user = requireAuth(ctx.req, ctx.res, ["BUYER", "SELLER", "SELLER_PRO"]); if (!user) return;
   const items = db.contactReveals
     .filter((r) => r.userId === user.id)
     .map((r) => ({ ...r, listing: listingView(db.listings.find((l) => l.id === r.listingId)) }));
@@ -482,7 +482,7 @@ route("GET", "listings/:id", (ctx) => {
   ok(ctx.res, { listing: listingView(listing) });
 });
 route("POST", "listings/:id/contact", (ctx) => {
-  const user = requireAuth(ctx.req, ctx.res, ["BUYER"]); if (!user) return;
+  const user = requireAuth(ctx.req, ctx.res, ["BUYER", "SELLER", "SELLER_PRO"]); if (!user) return;
   const listing = db.listings.find((l) => l.id === ctx.params.id);
   if (!listing) return fail(ctx.res, 404, "RECORD_NOT_FOUND", "Annonce introuvable.");
   const isPro = hasActiveSubscription(listing.userId);
@@ -703,7 +703,7 @@ route("POST", "subscriptions/cancel", (ctx) => {
 
 /* ── Demands ── */
 route("POST", "demands/initiate", (ctx) => {
-  const user = requireAuth(ctx.req, ctx.res, ["BUYER"]); if (!user) return;
+  const user = requireAuth(ctx.req, ctx.res, ["BUYER", "SELLER", "SELLER_PRO"]); if (!user) return;
   const b = ctx.body ?? {};
   const type = b.type === "EXPRESS" ? "EXPRESS" : "STANDARD";
   const amount = type === "STANDARD" ? 2500 : Math.max(5000, Math.round((Number(b.propertyValue) || 0) * 0.03));
@@ -735,13 +735,16 @@ route("GET", "demands/standard", (ctx) => {
   paginate(ctx.res, db.demands.filter((d) => d.status === "ACTIVE" && d.type === "STANDARD"), ctx.query);
 });
 route("GET", "demands/me", (ctx) => {
-  const user = requireAuth(ctx.req, ctx.res, ["BUYER"]); if (!user) return;
+  const user = requireAuth(ctx.req, ctx.res, ["BUYER", "SELLER", "SELLER_PRO"]); if (!user) return;
   paginate(ctx.res, db.demands.filter((d) => d.userId === user.id), ctx.query);
 });
 route("PATCH", "demands/:id/close", (ctx) => {
-  const user = requireAuth(ctx.req, ctx.res, ["BUYER", "ADMIN"]); if (!user) return;
+  const user = requireAuth(ctx.req, ctx.res, ["BUYER", "SELLER", "SELLER_PRO", "ADMIN"]); if (!user) return;
   const demand = db.demands.find((d) => d.id === ctx.params.id);
   if (!demand) return fail(ctx.res, 404, "RECORD_NOT_FOUND", "Demande introuvable.");
+  if (user.role !== "ADMIN" && demand.userId !== user.id) {
+    return fail(ctx.res, 403, "FORBIDDEN", "Vous ne pouvez fermer que vos propres demandes.");
+  }
   demand.status = "CLOSED";
   ok(ctx.res, { demand }, "Demande clôturée.");
 });

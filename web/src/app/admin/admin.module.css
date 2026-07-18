@@ -89,12 +89,12 @@
   display: grid;
   place-items: center;
   border-radius: 50%;
-  background: linear-gradient(135deg, #fde68a, #fbbf24);
+  background: var(--orange);
   color: var(--ink);
   font-size: 0.75rem;
   font-weight: 900;
   text-decoration: none;
-  box-shadow: 0 4px 12px rgba(251, 191, 36, 0.32);
+  box-shadow: none;
 }
 
 .adminChatFab {
@@ -426,6 +426,7 @@
 .adminModerationRef_orange { background: rgba(249, 115, 22, 0.14); color: var(--orange); }
 .adminModerationRef_blue { background: rgba(59, 130, 246, 0.14); color: var(--blue); }
 .adminModerationRef_red { background: rgba(220, 38, 38, 0.14); color: #dc2626; }
+.adminModerationRef_violet { background: rgba(139, 92, 246, 0.14); color: var(--violet); }
 
 .adminModerationItem strong {
   display: block;
@@ -1308,11 +1309,20 @@
   display: grid;
   place-items: center;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--orange), #fb923c);
+  background: var(--orange);
   color: #ffffff;
   font-size: 0.78rem;
   font-weight: 900;
-  box-shadow: 0 6px 14px rgba(249, 115, 22, 0.32);
+  box-shadow: none;
+}
+
+.page > .spaceContent {
+  width: 100%;
+  max-width: 1280px;
+  justify-self: center;
+  margin: 0;
+  padding: 4px 0 80px;
+  gap: 20px;
 }
 
 .profileText {
@@ -1455,7 +1465,7 @@
   display: grid;
   place-items: center;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--orange), #fb923c);
+  background: var(--orange);
   color: #ffffff;
   font-size: 0.78rem;
   font-weight: 900;

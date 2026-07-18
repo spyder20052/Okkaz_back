@@ -9,6 +9,7 @@ export default function Footer() {
   const textRef = useRef<HTMLHeadingElement>(null);
 
   useEffect(() => {
+    const observedText = textRef.current;
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
@@ -22,13 +23,13 @@ export default function Footer() {
       { threshold: 0.2 } // Trigger when 20% of the element is visible
     );
 
-    if (textRef.current) {
-      observer.observe(textRef.current);
+    if (observedText) {
+      observer.observe(observedText);
     }
 
     return () => {
-      if (textRef.current) {
-        observer.unobserve(textRef.current);
+      if (observedText) {
+        observer.unobserve(observedText);
       }
     };
   }, []);

@@ -23,6 +23,7 @@ export default function Navbar() {
   const menuLinks = [
     { href: "/", label: "Accueil" },
     { href: "/annonces", label: "Biens" },
+    { href: "/demandes", label: "Je recherche" },
     { href: "/vendeur", label: "Publier un bien" },
     { href: "/contact", label: "Contact" },
     { href: "/faq", label: "FAQ" },
@@ -162,7 +163,7 @@ export default function Navbar() {
             >
               {menuLinks.map((item) => (
                 <Link
-                  key={item.href}
+                  key={`${item.href}-${item.label}`}
                   href={item.href}
                   className={item.mobileOnly ? styles.mobileOnlyLink : undefined}
                   onClick={() => setIsMenuOpen(false)}

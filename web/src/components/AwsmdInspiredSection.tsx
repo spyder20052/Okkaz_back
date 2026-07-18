@@ -144,22 +144,24 @@ export default function AwsmdInspiredSection() {
       `.${styles.soft} .${styles.cardTop} span, .${styles.blue} .${styles.cardTop} span`
     );
 
-    gsap.fromTo(
-      animatedTags,
-      { y: 10, autoAlpha: 0 },
-      {
-        y: 0,
-        autoAlpha: 1,
-        stagger: 0.08,
-        duration: 0.55,
-        ease: "power2.out",
-        scrollTrigger: {
-          trigger: sectionRef.current,
-          start: "top 78%",
-          toggleActions: "play none none reverse",
-        },
-      }
-    );
+    if (animatedTags.length > 0) {
+      gsap.fromTo(
+        animatedTags,
+        { y: 10, autoAlpha: 0 },
+        {
+          y: 0,
+          autoAlpha: 1,
+          stagger: 0.08,
+          duration: 0.55,
+          ease: "power2.out",
+          scrollTrigger: {
+            trigger: sectionRef.current,
+            start: "top 78%",
+            toggleActions: "play none none reverse",
+          },
+        }
+      );
+    }
 
     return () => mm.revert();
   }, { scope: sectionRef, dependencies: [listings.length], revertOnUpdate: true });

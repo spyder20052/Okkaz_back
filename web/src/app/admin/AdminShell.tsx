@@ -20,7 +20,6 @@ const menuItems = [
   { href: "/admin/abonnements", label: "Abonnements", icon: "B" },
   { href: "/admin/paiements", label: "Paiements", icon: "P" },
   { href: "/admin/categories", label: "Categories", icon: "C" },
-  { href: "/admin/journal", label: "Journal", icon: "J" },
   { href: "/admin/reglages", label: "Reglages", icon: "S" },
 ];
 

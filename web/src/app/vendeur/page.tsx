@@ -14,12 +14,20 @@ import {
   type KycStatus,
   type Listing,
   type ListingStatus,
+  type Payment,
   type Subscription,
 } from "@/lib/types";
 import SellerShell from "./SellerShell";
 import styles from "./vendeur.module.css";
 
 type Tab = "overview" | "settings";
+type ContactRevealHistory = {
+  id: string;
+  createdAt: string;
+  phone?: string;
+  contactPhone?: string;
+  listing?: Pick<Listing, "id" | "title">;
+};
 
 const KYC_STATUS_LABELS: Record<KycStatus, string> = {
   NONE: "Identité non vérifiée",
@@ -32,6 +40,19 @@ const KYC_DOC_LABELS: Record<KycDocumentType, string> = {
   ID_CARD: "Carte d'identité",
   PASSPORT: "Passeport",
   DRIVER_LICENSE: "Permis de conduire",
+};
+
+const PAYMENT_TYPE_LABELS: Record<Payment["type"], string> = {
+  SUBSCRIPTION: "Abonnement Premium",
+  DEMAND_LISTING: "Demande standard",
+  EXPRESS_DEMAND: "Demande express",
+};
+
+const PAYMENT_STATUS_LABELS: Record<Payment["status"], string> = {
+  SUCCESS: "Réussi",
+  PENDING: "En attente",
+  FAILED: "Échec",
+  REFUNDED: "Remboursé",
 };
 
 const STATUS_BADGE_STYLE: Record<ListingStatus, React.CSSProperties> = {
@@ -80,6 +101,8 @@ function UserSpaceContent() {
 
   // --- Abonnement ---
   const [subscription, setSubscription] = useState<Subscription | null>(null);
+  const [contactHistory, setContactHistory] = useState<ContactRevealHistory[]>([]);
+  const [paymentHistory, setPaymentHistory] = useState<Payment[]>([]);
 
   // --- KYC ---
   const [kycStatus, setKycStatus] = useState<KycStatus>(user?.kycStatus ?? "NONE");
@@ -148,6 +171,14 @@ function UserSpaceContent() {
       .get<{ subscription: Subscription | null }>("/subscriptions/me")
       .then((res) => setSubscription(res.data.subscription))
       .catch(() => setSubscription(null));
+    api
+      .getPaginated<ContactRevealHistory>("/users/me/contact-reveals", { page: 1, limit: 20 })
+      .then((res) => setContactHistory(res.data))
+      .catch(() => setContactHistory([]));
+    api
+      .getPaginated<Payment>("/users/me/payments", { page: 1, limit: 20 })
+      .then((res) => setPaymentHistory(res.data))
+      .catch(() => setPaymentHistory([]));
   }, [refreshUser, loadListings, loadKyc]);
 
   // Synchronise le formulaire Paramètres avec le profil (ajustement pendant le rendu,
@@ -396,6 +427,12 @@ function UserSpaceContent() {
                 <header className={styles.spaceAdsHeader}>
                   <h2>Mes Annonces <span className={styles.spaceAdsCount}>{listings.length}</span></h2>
                   <div className={styles.spaceAdsHeaderActions}>
+                    <Link href="/demandes" className={styles.spaceSearchBtn}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                      </svg>
+                      Mes demandes
+                    </Link>
                     <Link href="/vendeur/publier" className={styles.spaceVendreBtn}>
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
                         <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/>
@@ -520,6 +557,67 @@ function UserSpaceContent() {
                 </div>
               </div>
             </div>
+
+            <section className={styles.historyGrid}>
+              <article className={styles.historyCard}>
+                <header className={styles.historyHeader}>
+                  <span className={`${styles.historyIcon} ${styles.historyIconBlue}`} aria-hidden>↗</span>
+                  <div>
+                    <small>Mes recherches</small>
+                    <h2>Contacts que j&apos;ai consultés</h2>
+                  </div>
+                  <strong>{contactHistory.length}</strong>
+                </header>
+                {contactHistory.length === 0 ? (
+                  <p className={styles.historyEmpty}>Aucun contact consulté pour le moment.</p>
+                ) : (
+                  <ul className={styles.historyList}>
+                    {contactHistory.map((item) => (
+                      <li key={item.id} className={styles.historyItem}>
+                        <div className={styles.historyItemMain}>
+                          <Link className={styles.historyItemTitle} href={item.listing ? `/annonces/${item.listing.id}` : "/annonces"}>
+                            {item.listing?.title ?? "Annonce consultée"}
+                          </Link>
+                          <p>Consulté le {new Date(item.createdAt).toLocaleDateString("fr-FR")}</p>
+                        </div>
+                        <span className={styles.historyContact}>{item.phone ?? item.contactPhone ?? "Numéro sécurisé"}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </article>
+
+              <article className={styles.historyCard}>
+                <header className={styles.historyHeader}>
+                  <span className={`${styles.historyIcon} ${styles.historyIconGreen}`} aria-hidden>₣</span>
+                  <div>
+                    <small>Mon activité</small>
+                    <h2>Historique des paiements</h2>
+                  </div>
+                  <strong>{paymentHistory.length}</strong>
+                </header>
+                {paymentHistory.length === 0 ? (
+                  <p className={styles.historyEmpty}>Aucun paiement pour le moment.</p>
+                ) : (
+                  <ul className={styles.historyList}>
+                    {paymentHistory.map((payment) => (
+                      <li key={payment.id} className={styles.historyItem}>
+                        <div className={styles.historyItemMain}>
+                          <b className={styles.historyItemTitle}>{PAYMENT_TYPE_LABELS[payment.type]}</b>
+                          <p>{new Date(payment.createdAt).toLocaleDateString("fr-FR")}</p>
+                        </div>
+                        <div className={styles.historyPaymentMeta}>
+                          <span className={`${styles.historyStatus} ${styles[`historyStatus_${payment.status.toLowerCase()}`]}`}>
+                            {PAYMENT_STATUS_LABELS[payment.status]}
+                          </span>
+                          <strong>{formatPrice(payment.amount)}</strong>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </article>
+            </section>
           </>
         ) : (
           <>

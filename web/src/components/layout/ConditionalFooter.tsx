@@ -9,6 +9,11 @@ export default function ConditionalFooter() {
 
   const shouldShowFooter =
     pathname !== "/connexion" &&
+    pathname !== "/mot-de-passe-oublie" &&
+    !pathname.startsWith("/reset-password/") &&
+    !pathname.startsWith("/reinitialiser-mot-de-passe/") &&
+    !pathname.startsWith("/verify-email/") &&
+    !pathname.startsWith("/verifier-email/") &&
     !pathname.startsWith("/admin") &&
     !pathname.startsWith("/vendeur") &&
     !pathname.startsWith("/annonces/");

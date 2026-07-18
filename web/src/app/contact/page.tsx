@@ -7,7 +7,7 @@ import styles from "./contact.module.css";
 const CONTACT_LINKS = [
   { label: "WhatsApp", href: "https://wa.me/22900000000", tone: styles.stickerGreen },
   { label: "Email", href: "mailto:contact@okkaz.bj", tone: styles.stickerLight },
-  { label: "Chat OKKAZ", href: "/chat", tone: styles.stickerOrange },
+  { label: "Support OKKAZ", href: "mailto:support@okkaz.bj", tone: styles.stickerOrange },
   { label: "LinkedIn", href: "https://www.linkedin.com", tone: styles.stickerLight },
   { label: "Facebook", href: "https://www.facebook.com", tone: styles.stickerBlue },
 ];

@@ -111,9 +111,12 @@ function AdDetailContent() {
   useEffect(() => {
     if (!id) return;
     let cancelled = false;
-    setIsLoading(true);
-    setNotFound(false);
-    setLoadError(null);
+    queueMicrotask(() => {
+      if (cancelled) return;
+      setIsLoading(true);
+      setNotFound(false);
+      setLoadError(null);
+    });
     api
       .get<{ listing: Listing }>(`/listings/${id}`, undefined, false)
       .then((res) => {
@@ -454,7 +457,7 @@ function AdDetailContent() {
                 </Link>
               </div>
               <p className={styles.lockedContact}>
-                Connectez-vous avec un compte acheteur pour afficher le numéro de mise en relation.
+                Connectez-vous pour afficher le numéro de mise en relation.
               </p>
             </>
           ) : !isBuyer ? (
@@ -514,7 +517,9 @@ function AdDetailContent() {
           <div className={styles.sellerRow}>
             <div className={styles.sellerAvatar}>{ownerName[0]}</div>
             <div>
-              <p className={styles.sellerName}>{ownerName}</p>
+              <p className={styles.sellerName}>
+                {listing.owner?.id ? <Link href={`/vendeurs/${listing.owner.id}`}>{ownerName}</Link> : ownerName}
+              </p>
               <p className={styles.sellerMeta}>
                 {ownerRole}
                 {listing.owner?.city ? ` · ${listing.owner.city}` : ""}

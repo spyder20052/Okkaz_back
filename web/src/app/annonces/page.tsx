@@ -23,6 +23,7 @@ const SORTS = [
 
 const PAGE_SIZE = 12;
 const HERO_LETTERS = ["b", "i", "e", "n", "s"];
+const VISIBLE_CATEGORY_SLUGS = new Set(["automobiles", "electromenager", "electronique"]);
 
 function coverUrl(listing: Listing): string {
   const photos = listing.photos ?? [];
@@ -38,6 +39,9 @@ function AnnoncesContent() {
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryId, setCategoryId] = useState<string>("");
   const [loaOnly, setLoaOnly] = useState(false);
+  const [city, setCity] = useState("");
+  const [minPrice, setMinPrice] = useState("");
+  const [maxPrice, setMaxPrice] = useState("");
   const [sort, setSort] = useState<(typeof SORTS)[number]["value"]>("recent");
   const [page, setPage] = useState(1);
 
@@ -58,7 +62,7 @@ function AnnoncesContent() {
       .then((res) => {
         if (cancelled) return;
         setCategories(res.data.categories);
-        if (categorySlugParam) {
+        if (categorySlugParam && VISIBLE_CATEGORY_SLUGS.has(categorySlugParam)) {
           const match = res.data.categories.find((cat) => cat.slug === categorySlugParam);
           if (match) setCategoryId(match.id);
         }
@@ -78,16 +82,14 @@ function AnnoncesContent() {
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
-  // Retour page 1 quand un filtre change
-  useEffect(() => {
-    setPage(1);
-  }, [debouncedSearch, categoryId, loaOnly, sort]);
-
   // Chargement des annonces
   useEffect(() => {
     let cancelled = false;
-    setIsLoading(true);
-    setError(null);
+    queueMicrotask(() => {
+      if (cancelled) return;
+      setIsLoading(true);
+      setError(null);
+    });
     api
       .getPaginated<Listing>(
         "/listings",
@@ -95,6 +97,9 @@ function AnnoncesContent() {
           q: debouncedSearch.slice(0, 100) || undefined,
           categoryId: categoryId || undefined,
           isLoa: loaOnly ? true : undefined,
+          city: city.trim() || undefined,
+          minPrice: minPrice || undefined,
+          maxPrice: maxPrice || undefined,
           sort,
           page,
           limit: PAGE_SIZE,
@@ -116,11 +121,17 @@ function AnnoncesContent() {
     return () => {
       cancelled = true;
     };
-  }, [debouncedSearch, categoryId, loaOnly, sort, page]);
+  }, [debouncedSearch, categoryId, loaOnly, city, minPrice, maxPrice, sort, page]);
 
   const heroCenter = (HERO_LETTERS.length - 1) / 2;
   const categoryChips = useMemo(
-    () => [{ id: "", name: "Toutes" }, ...categories.map((cat) => ({ id: cat.id, name: cat.name }))],
+    () => categories
+      .filter((cat) => VISIBLE_CATEGORY_SLUGS.has(cat.slug))
+      .map((cat) => ({ id: cat.id, name: cat.name })),
+    [categories],
+  );
+  const otherCategories = useMemo(
+    () => categories.filter((cat) => !VISIBLE_CATEGORY_SLUGS.has(cat.slug)),
     [categories],
   );
 
@@ -166,41 +177,139 @@ function AnnoncesContent() {
               placeholder="Titre ou description"
               value={searchTerm}
               maxLength={100}
-              onChange={(event) => setSearchTerm(event.target.value)}
+              onChange={(event) => {
+                setSearchTerm(event.target.value);
+                setPage(1);
+              }}
             />
           </label>
 
           <div className={styles.filterGroup} aria-label="Filtrer par catégorie">
+            <details className={styles.filterDropdown}>
+              <summary
+                className={categoryId === "" ? styles.activeFilter : undefined}
+                onClick={() => {
+                  setCategoryId("");
+                  setPage(1);
+                }}
+              >
+                Toutes
+              </summary>
+              <div className={`${styles.filterDropdownPanel} ${styles.categoryDropdownPanel}`}>
+                <button
+                  type="button"
+                  className={categoryId === "" ? styles.activeFilter : undefined}
+                  onClick={(event) => {
+                    setCategoryId("");
+                    setPage(1);
+                    event.currentTarget.closest("details")?.removeAttribute("open");
+                  }}
+                >
+                  Toutes les catégories
+                </button>
+                {otherCategories.map((cat) => (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    className={categoryId === cat.id ? styles.activeFilter : undefined}
+                    onClick={(event) => {
+                      setCategoryId(cat.id);
+                      setPage(1);
+                      event.currentTarget.closest("details")?.removeAttribute("open");
+                    }}
+                  >
+                    {cat.name}
+                  </button>
+                ))}
+              </div>
+            </details>
             {categoryChips.map((cat) => (
               <button
                 key={cat.id || "all"}
                 type="button"
                 className={categoryId === cat.id ? styles.activeFilter : undefined}
-                onClick={() => setCategoryId(cat.id)}
+                onClick={() => {
+                  setCategoryId(cat.id);
+                  setPage(1);
+                }}
               >
                 {cat.name}
               </button>
             ))}
           </div>
 
-          <div className={styles.filterGroup} aria-label="Filtrer et trier">
+          <div className={`${styles.filterGroup} ${styles.filterActions}`} aria-label="Filtrer et trier">
+            <details className={styles.filterDropdown}>
+              <summary>
+                Ville &amp; prix
+                {(city || minPrice || maxPrice) && <span className={styles.filterCount}>●</span>}
+              </summary>
+              <div className={styles.filterDropdownPanel}>
+                <label className={styles.filterField}>
+                  <span>Ville</span>
+                  <input
+                    type="text"
+                    placeholder="Ex. Cotonou"
+                    value={city}
+                    onChange={(event) => { setCity(event.target.value); setPage(1); }}
+                  />
+                </label>
+                <div className={styles.priceFields}>
+                  <label className={styles.filterField}>
+                    <span>Prix minimum</span>
+                    <input
+                      type="number"
+                      min="0"
+                      placeholder="0 FCFA"
+                      value={minPrice}
+                      onChange={(event) => { setMinPrice(event.target.value); setPage(1); }}
+                    />
+                  </label>
+                  <label className={styles.filterField}>
+                    <span>Prix maximum</span>
+                    <input
+                      type="number"
+                      min="0"
+                      placeholder="Sans limite"
+                      value={maxPrice}
+                      onChange={(event) => { setMaxPrice(event.target.value); setPage(1); }}
+                    />
+                  </label>
+                </div>
+              </div>
+            </details>
             <button
               type="button"
               className={loaOnly ? styles.activeFilter : undefined}
-              onClick={() => setLoaOnly((current) => !current)}
+              onClick={() => {
+                setLoaOnly((current) => !current);
+                setPage(1);
+              }}
             >
               Achat / Vente (LOA)
             </button>
-            {SORTS.map((item) => (
-              <button
-                key={item.value}
-                type="button"
-                className={sort === item.value ? styles.activeFilter : undefined}
-                onClick={() => setSort(item.value)}
-              >
-                {item.label}
-              </button>
-            ))}
+            <details className={`${styles.filterDropdown} ${styles.sortDropdown}`}>
+              <summary>
+                Trier : {SORTS.find((item) => item.value === sort)?.label ?? "Récentes"}
+              </summary>
+              <div className={`${styles.filterDropdownPanel} ${styles.sortOptions}`}>
+                {SORTS.map((item) => (
+                  <button
+                    key={item.value}
+                    type="button"
+                    className={sort === item.value ? styles.activeSort : undefined}
+                    onClick={(event) => {
+                      setSort(item.value);
+                      setPage(1);
+                      event.currentTarget.closest("details")?.removeAttribute("open");
+                    }}
+                  >
+                    <span>{item.label}</span>
+                    {sort === item.value && <span aria-hidden>✓</span>}
+                  </button>
+                ))}
+              </div>
+            </details>
           </div>
         </div>
 

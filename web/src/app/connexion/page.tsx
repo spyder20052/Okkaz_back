@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import styles from "./connexion.module.css";
@@ -36,13 +37,18 @@ export default function ConnexionPage() {
   const [registerPassword, setRegisterPassword] = useState("");
   const [role, setRole] = useState<"BUYER" | "SELLER">("BUYER");
 
+  function destinationFor(user: ApiUser): string {
+    const requested = new URLSearchParams(window.location.search).get("next");
+    return requested?.startsWith("/") && !requested.startsWith("//") ? requested : homeForRole(user);
+  }
+
   async function handleLogin(e: FormEvent) {
     e.preventDefault();
     setError(null);
     setIsSubmitting(true);
     try {
       const user = await login(identifier, password);
-      router.push(homeForRole(user));
+      router.push(destinationFor(user));
     } catch (err) {
       setError(
         err instanceof ApiError
@@ -69,7 +75,7 @@ export default function ConnexionPage() {
         password: registerPassword,
         role,
       });
-      router.push(homeForRole(user));
+      router.push(destinationFor(user));
     } catch (err) {
       if (err instanceof ApiError) {
         if (err.code === "USER_ALREADY_EXISTS") {
@@ -102,7 +108,7 @@ export default function ConnexionPage() {
         />
       </div>
 
-      <section className={styles.card}>
+      <section className={`${styles.card} ${mode === "register" ? styles.registerCard : ""}`}>
         <Image
           src="/IMG_0537.PNG"
           alt=""
@@ -155,12 +161,15 @@ export default function ConnexionPage() {
                 required
               />
             </label>
+            <Link href="/mot-de-passe-oublie" className={styles.switchMode}>
+              Mot de passe oublié ?
+            </Link>
             <button type="submit" className={styles.btnApple} disabled={isSubmitting}>
               {isSubmitting ? "Connexion…" : "Se connecter"}
             </button>
           </form>
         ) : (
-          <form className={styles.form} onSubmit={handleRegister}>
+          <form className={`${styles.form} ${styles.registerForm}`} onSubmit={handleRegister}>
             <div className={styles.fieldRow}>
               <label className={styles.field}>
                 <span className={styles.label}>Prénom</span>

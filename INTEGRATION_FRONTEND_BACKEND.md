@@ -67,20 +67,18 @@ Le frontend livré était **100 % statique** : aucune requête réseau, aucune a
 ## 2. Lancer l'ensemble en local
 
 ```bash
-# 1. Backend (repo 5core-team/okkaz_backend, branche dev)
-cd okkaz_backend
-cp .env.example .env          # remplir JWT_SECRET, JWT_REFRESH_SECRET (openssl rand -hex 64),
-                              # ENCRYPTION_KEY (openssl rand -base64 32) et les clés KKiaPay sandbox
-docker compose up -d          # démarre PostgreSQL 16 (port 5432)
-npm install
-npx prisma migrate deploy     # applique le schéma
-npm run seed                  # catégories + settings + compte admin
-npm run seed:demo             # comptes vendeur/acheteur + 4 annonces actives (relançable)
-npm run dev                   # API sur http://localhost:3000 (Swagger: /api/v1/docs)
+# 1. PostgreSQL (docker)
+docker start okkaz-postgres   # créé via: docker run -d --name okkaz-postgres \
+                              #   -e POSTGRES_USER=okkaz -e POSTGRES_PASSWORD=okkaz \
+                              #   -e POSTGRES_DB=okkaz_dev -p 5432:5432 postgres:16-alpine
 
-# 2. Frontend (port 3002 — le 3000 est pris par l'API)
+# 2. Backend (port 3000)
+cd okkaz_backend
+npm install && npx prisma migrate deploy && npm run seed
+npm run dev
+
+# 3. Frontend (port 3002 — le 3000 est pris par l'API)
 cd <repo-front>/web
-cp .env.example .env.local    # renseigner la clé publique KKiaPay
 npm install
 npm run dev -- -p 3002        # ou: npx next build && npx next start -p 3002
 ```
@@ -91,16 +89,14 @@ NEXT_PUBLIC_API_URL=http://localhost:3000/api/v1
 NEXT_PUBLIC_KKIAPAY_PUBLIC_KEY=<clé publique sandbox>
 NEXT_PUBLIC_KKIAPAY_SANDBOX=true
 ```
-Côté backend, `FRONTEND_URL` accepte **plusieurs origines séparées par des virgules** (ex. `http://localhost:3002,http://localhost:5173`) — ajoutez l'origine de votre serveur Next si vous utilisez un autre port.
+Côté backend, `.env` : `FRONTEND_URL=http://localhost:3002` (CORS).
 
-**Comptes de test** (créés par `npm run seed` + `npm run seed:demo`) :
+**Comptes de test** (base seedée) :
 | Compte | Rôle | Identifiants |
 |---|---|---|
 | Admin | ADMIN | `admin@okkaz.bj` / `Admin@OKKAZ2026` |
-| Vendeur (KYC approuvé, 4 annonces actives) | SELLER | `seller.demo@okkaz.bj` / `Seller@2026` |
-| Acheteur | BUYER | `buyer.demo@okkaz.bj` / `Buyer@2026` |
-
-Pour tester les parcours au fur et à mesure : se connecter en acheteur pour consulter contacts/avis, en vendeur pour publier (les annonces partent en PENDING), puis en admin (`/admin/annonces`) pour les valider. Swagger complet sur `http://localhost:3000/api/v1/docs`.
+| Vendeur (KYC approuvé, 3 annonces actives) | SELLER | `seller.demo@okkaz.bj` / `Seller@2026` |
+| Acheteur | BUYER | `buyer.test@okkaz.bj` / `Password1` |
 
 ⚠️ Rate limit : 10 requêtes / 15 min / IP sur `/auth/*` (login, register, forgot-password).
 

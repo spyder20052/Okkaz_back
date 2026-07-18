@@ -2,7 +2,6 @@
 // - Attache automatiquement le Bearer token
 // - Rafraîchit le token sur 401 (une seule tentative) puis rejoue la requête
 // - Normalise les erreurs backend ({ success:false, error:{ code, message, details } })
-
 export const API_URL =
   process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000/api/v1";
 
@@ -50,8 +49,10 @@ export function writeAuth(auth: StoredAuth | null) {
   if (typeof window === "undefined") return;
   if (auth) {
     window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(auth));
+    document.cookie = `okkaz_session_role=${encodeURIComponent(auth.user.role)}; Path=/; Max-Age=2592000; SameSite=Lax`;
   } else {
     window.localStorage.removeItem(AUTH_STORAGE_KEY);
+    document.cookie = "okkaz_session_role=; Path=/; Max-Age=0; SameSite=Lax";
   }
   window.dispatchEvent(new Event(AUTH_UPDATED_EVENT));
 }
@@ -61,7 +62,10 @@ export function writeAuth(auth: StoredAuth | null) {
 export function mediaUrl(url: string | null | undefined): string {
   if (!url) return "/ads/car1.jpg";
   if (url.startsWith("http") || url.startsWith("data:")) return url;
-  return `${API_ORIGIN}${url}`;
+  // Les assets du dossier public Next (/ads, /images, etc.) restent locaux.
+  // Seuls les fichiers uploadés par l'API doivent être préfixés par son origine.
+  if (url.startsWith("/uploads/")) return `${API_ORIGIN}${url}`;
+  return url;
 }
 
 let refreshPromise: Promise<boolean> | null = null;

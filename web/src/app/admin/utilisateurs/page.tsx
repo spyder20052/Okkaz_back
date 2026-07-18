@@ -53,6 +53,7 @@ export default function AdminUtilisateursPage() {
   const [appliedQuery, setAppliedQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState<UserRole | "">("");
   const [statusFilter, setStatusFilter] = useState<UserStatus | "">("");
+  const [kycFilter, setKycFilter] = useState<ApiUser["kycStatus"] | "">("");
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [feedback, setFeedback] = useState<string | null>(null);
@@ -77,6 +78,7 @@ export default function AdminUtilisateursPage() {
         q: appliedQuery || undefined,
         role: roleFilter || undefined,
         status: statusFilter || undefined,
+        kycStatus: kycFilter || undefined,
         page,
         limit: 10,
       });
@@ -87,7 +89,7 @@ export default function AdminUtilisateursPage() {
     } finally {
       setLoading(false);
     }
-  }, [appliedQuery, roleFilter, statusFilter, page]);
+  }, [appliedQuery, roleFilter, statusFilter, kycFilter, page]);
 
   useEffect(() => {
     const timer = setTimeout(() => void load(), 0);
@@ -233,6 +235,18 @@ export default function AdminUtilisateursPage() {
               }}
             >
               {ROLE_LABELS[r]}
+            </button>
+          ))}
+        </div>
+        <div className={styles.adminFilterBar}>
+          {(["", "NONE", "PENDING", "APPROVED", "REJECTED"] as const).map((status) => (
+            <button
+              key={status || "ALL_KYC"}
+              type="button"
+              className={`${styles.adminFilterPill} ${kycFilter === status ? styles.adminFilterPillActive : ""}`}
+              onClick={() => { setKycFilter(status); setPage(1); }}
+            >
+              {status === "" ? "Tous KYC" : `KYC ${status}`}
             </button>
           ))}
         </div>
