@@ -426,6 +426,18 @@ export async function revealContact(userId: string, listingId: string) {
   if (!listing)
     throw AppError.notFound("LISTING_NOT_FOUND", "Annonce introuvable.");
 
+  // Le propriétaire consulte sa propre annonce : on lui renvoie son vrai
+  // numéro sans enregistrer de consultation (ne fausse pas contacts_count
+  // et n'ouvre pas le droit à un avis — de toute façon bloqué par
+  // CANNOT_REVIEW_SELF).
+  if (listing.userId === userId) {
+    return {
+      contactPhone: decrypt(listing.contactPhone),
+      isOwnerNumber: true,
+      watermark: buildWatermark(userId),
+    };
+  }
+
   // L'annonceur a-t-il un abonnement actif ?
   const activeSubscription = await prisma.subscription.findFirst({
     where: {

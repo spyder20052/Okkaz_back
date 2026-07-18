@@ -110,8 +110,8 @@ Pour tester les parcours au fur et à mesure : se connecter en acheteur pour con
 
 ### A. Divergences produit MAJEURES (à trancher ensemble)
 
-**1. « Je recherche » est réservé au rôle BUYER, mais la page est dans l'espace vendeur.**
-`POST /demands/initiate` renvoie 403 pour un SELLER (vérifié). La page `/vendeur/recherches/nouvelle` est donc inutilisable par ceux qui y ont accès. L'UI affiche désormais un message clair, mais il faut décider : **soit** le back ouvre l'endpoint aux SELLER/SELLER_PRO, **soit** le front déplace ce flux côté acheteur (avec un espace acheteur, cf. point C1). *Décision produit requise.*
+**1. ~~« Je recherche » réservé au rôle BUYER~~ — ✅ RÉSOLU (18 juil. 2026).**
+`POST /listings/:id/contact` et `POST /demands/initiate` (+ `GET /demands/me`, `PATCH /demands/:id/close`) sont désormais ouverts aux rôles SELLER/SELLER_PRO : un vendeur peut agir comme consommateur, conformément au cahier des charges (« création de compte obligatoire pour toute action »). Cas particulier géré : le propriétaire qui consulte le contact de **sa propre annonce** reçoit son vrai numéro déchiffré, sans traçage de consultation (ne fausse pas les stats, n'ouvre pas le droit à un avis).
 
 **2. L'option « Numéro direct +2 500 FCFA » par annonce n'existe pas.**
 Dans le backend, la consultation du contact est **gratuite** : l'acheteur connecté clique « voir le contact », et reçoit le **vrai numéro du vendeur uniquement si celui-ci a un abonnement Premium actif** ; sinon le numéro de mise en relation de la plateforme (WCC). Le toggle payant du wizard de publication et le flux `?type=direct_number` de la page paiement ont été neutralisés. *Le front doit abandonner ce concept ou le back doit créer ce produit payant.*
@@ -177,7 +177,7 @@ Autres détails :
 | 30 | **Rate limiting** | 200 req/15 min global, 10 req/15 min sur l'auth (valeurs codées en dur, les vars `RATE_LIMIT_*` du .env ne sont pas câblées) |
 | 31 | **Refresh token** | Expire à 7 jours dans le code (le `.env` annonce 30 j — non câblé). Transmis en body JSON, pas en cookie |
 | 32 | **Incohérence API mineure** | La liste `GET /listings` expose `contactPhoneWcc`, le détail expose `contactPhoneDisplayed` — à unifier côté back |
-| 33 | **Mode édition d'annonce** | Le back ne renvoie jamais le vrai `contactPhone` au propriétaire → le formulaire d'édition préremplit avec le téléphone du compte. Suggestion back : renvoyer le numéro déchiffré quand `userId === owner` |
+| 33 | ~~Mode édition d'annonce~~ ✅ RÉSOLU | Le propriétaire qui appelle `POST /listings/:id/contact` sur sa propre annonce reçoit désormais son vrai numéro déchiffré (18 juil. 2026) |
 | 34 | **Catégories inactives** | `DELETE /categories/:id` est un soft-delete mais `GET /categories` ne renvoie que les actives → une catégorie désactivée devient invisible et irrécupérable depuis l'UI. Suggestion back : `GET /admin/categories?includeInactive=true` |
 | 35 | **Guards front = client-side** | La protection de /admin et /vendeur est en JavaScript client (pas de middleware serveur). Suffisant car l'API vérifie les rôles, mais un middleware Next serait plus propre |
 
@@ -185,10 +185,10 @@ Autres détails :
 
 ## 4. Récapitulatif des priorités proposées
 
-**À trancher produit (bloquant pour la cohérence)** : n°1 (demandes BUYER vs vendeur), n°2 (numéro direct), n°3 (boost), n°4 (réservation).
+**À trancher produit (bloquant pour la cohérence)** : n°2 (numéro direct), n°3 (boost), n°4 (réservation). Le n°1 (demandes BUYER vs vendeur) est résolu : routes ouvertes aux vendeurs.
 
 **Côté front (rapide, API déjà prête)** : n°19-20 (mot de passe oublié / vérif email), n°21 (liste des demandes pour vendeurs — cœur du produit), n°22-23 (profil public, espace acheteur), n°24 (modération avis), n°25 (filtres).
 
-**Côté back (avant prod)** : n°27 (stockage S3/Cloudinary), n°26 (webhook public), n°14 (GET /admin/subscriptions), n°16 (upload avatar), n°34 (catégories inactives), n°32-33 (contactPhone).
+**Côté back (avant prod)** : n°27 (stockage S3/Cloudinary), n°26 (webhook public), n°14 (GET /admin/subscriptions), n°16 (upload avatar), n°34 (catégories inactives), n°32 (nommage contactPhone).
 
 **Chantiers plus gros à planifier** : chat (n°6), notifications (n°7), favoris (n°18), journal/litiges/contrats admin (n°9-11), OAuth (n°5).

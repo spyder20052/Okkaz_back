@@ -17,10 +17,12 @@ router.get('/', validateRequest({ query: schemas.listListingsQuerySchema }), asy
 router.get('/featured', asyncHandler(controller.featured));
 router.get('/:id', validateRequest({ params: schemas.listingIdParamSchema }), asyncHandler(controller.detail));
 
+// Consultation ouverte à tout compte consommateur : un vendeur peut aussi louer
+// (cahier des charges : « création de compte obligatoire pour toute action »).
 router.post(
   '/:id/contact',
   authenticate,
-  authorize('BUYER'),
+  authorize('BUYER', 'SELLER', 'SELLER_PRO'),
   validateRequest({ params: schemas.listingIdParamSchema }),
   asyncHandler(controller.revealContact),
 );

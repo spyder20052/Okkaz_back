@@ -21,10 +21,12 @@ import { asyncHandler } from '../../utils/asyncHandler';
 
 const router = Router();
 
+// Les demandes sont payantes et ouvertes à tout compte consommateur : un
+// vendeur peut aussi chercher un bien (cahier des charges §6.2).
 router.post(
   '/initiate',
   authenticate,
-  authorize('BUYER'),
+  authorize('BUYER', 'SELLER', 'SELLER_PRO'),
   validateRequest({ body: schemas.initiateDemandSchema }),
   asyncHandler(controller.initiate),
 );
@@ -32,7 +34,7 @@ router.post(
 router.get('/', authenticate, authorize('SELLER_PRO'), asyncHandler(controller.listPro));
 router.get('/standard', authenticate, authorize('SELLER', 'SELLER_PRO'), asyncHandler(controller.listStandard));
 
-router.get('/me', authenticate, authorize('BUYER'), asyncHandler(controller.mine));
+router.get('/me', authenticate, authorize('BUYER', 'SELLER', 'SELLER_PRO'), asyncHandler(controller.mine));
 router.get(
   '/:id',
   authenticate,
@@ -43,7 +45,7 @@ router.get(
 router.patch(
   '/:id/close',
   authenticate,
-  authorize('BUYER', 'ADMIN'),
+  authorize('BUYER', 'SELLER', 'SELLER_PRO', 'ADMIN'),
   validateRequest({ params: schemas.demandIdParamSchema }),
   asyncHandler(controller.close),
 );
