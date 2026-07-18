@@ -16,7 +16,12 @@ const envSchema = z.object({
     .enum(["development", "staging", "production", "test"])
     .default("development"),
   PORT: z.coerce.number().int().positive().default(3000),
-  FRONTEND_URL: z.string().url().default("http://localhost:5173"),
+  // Une ou plusieurs origines front autorisées (CORS), séparées par des virgules.
+  FRONTEND_URL: z
+    .string()
+    .default("http://localhost:5173")
+    .transform((value) => value.split(",").map((origin) => origin.trim()))
+    .pipe(z.array(z.string().url()).min(1)),
   API_PREFIX: z.string().startsWith("/").default("/api/v1"),
 
   // DB

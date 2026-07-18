@@ -21,6 +21,7 @@
     "prisma:deploy": "prisma migrate deploy",
     "prisma:studio": "prisma studio",
     "seed": "tsx prisma/seed.ts",
+    "seed:demo": "tsx prisma/seed-demo.ts",
     "docs:api": "echo 'Swagger UI served at /api/v1/docs when server is running.'",
     "docs:build": "typedoc"
   },

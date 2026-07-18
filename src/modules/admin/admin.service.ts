@@ -13,6 +13,21 @@ import { invalidateSettingsCache } from '../../services/settings.service';
 // --- Users ------------------------------------------------------------------
 
 /**
+ * Retire les champs sensibles d'un utilisateur avant renvoi au client
+ * (hash de mot de passe, tokens de vérification/réinitialisation).
+ */
+function sanitizeUser<T extends Record<string, unknown>>(user: T) {
+  const {
+    passwordHash: _passwordHash,
+    emailVerificationToken: _emailVerificationToken,
+    resetPasswordToken: _resetPasswordToken,
+    resetPasswordExpiresAt: _resetPasswordExpiresAt,
+    ...safe
+  } = user;
+  return safe;
+}
+
+/**
  * Liste les utilisateurs (admin) avec filtrage et pagination.
  *
  * @param query - `{ role?, status?, kycStatus?, q? (recherche texte), page?, limit? }`.
@@ -82,7 +97,7 @@ export async function getUser(id: string) {
     },
   });
   if (!user) throw AppError.notFound('USER_NOT_FOUND', 'Utilisateur introuvable.');
-  return user;
+  return sanitizeUser(user);
 }
 
 /**
@@ -97,7 +112,8 @@ export async function getUser(id: string) {
 export async function setUserStatus(id: string, status: UserStatus, _reason?: string) {
   await assertUserExists(id);
   logger.info({ userId: id, status }, '🟢 Admin: user status updated');
-  return prisma.user.update({ where: { id }, data: { status } });
+  const user = await prisma.user.update({ where: { id }, data: { status } });
+  return sanitizeUser(user);
 }
 
 /**
@@ -111,7 +127,8 @@ export async function setUserStatus(id: string, status: UserStatus, _reason?: st
 export async function setUserRole(id: string, role: UserRole) {
   await assertUserExists(id);
   logger.info({ userId: id, role }, '🟢 Admin: user role updated');
-  return prisma.user.update({ where: { id }, data: { role } });
+  const user = await prisma.user.update({ where: { id }, data: { role } });
+  return sanitizeUser(user);
 }
 
 /**

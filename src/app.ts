@@ -91,7 +91,7 @@ export function createApp(): Application {
 
   app.use(
     cors({
-      origin: env.FRONTEND_URL,
+      origin: env.FRONTEND_URL, // une ou plusieurs origines (liste séparée par virgules dans .env)
       credentials: true,
       methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
       allowedHeaders: ['Content-Type', 'Authorization'],

@@ -1,0 +1,22 @@
+# Infrastructure de développement OKKAZ.
+# Usage : docker compose up -d
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: okkaz-postgres
+    environment:
+      POSTGRES_USER: okkaz
+      POSTGRES_PASSWORD: okkaz
+      POSTGRES_DB: okkaz_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - okkaz_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U okkaz -d okkaz_dev"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  okkaz_pgdata:

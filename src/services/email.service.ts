@@ -93,7 +93,7 @@ export function buildVerifyEmailHtml(
   token: string,
   firstName: string,
 ): { subject: string; text: string; html: string } {
-  const link = `${env.FRONTEND_URL}/verify-email/${token}`;
+  const link = `${env.FRONTEND_URL[0]}/verify-email/${token}`;
   return {
     subject: "OKKAZ — Vérifiez votre adresse email",
     text: `Bonjour ${firstName},\n\nConfirmez votre email : ${link}\n\nÀ bientôt sur OKKAZ.`,
@@ -112,7 +112,7 @@ export function buildResetPasswordHtml(
   token: string,
   firstName: string,
 ): { subject: string; text: string; html: string } {
-  const link = `${env.FRONTEND_URL}/reset-password/${token}`;
+  const link = `${env.FRONTEND_URL[0]}/reset-password/${token}`;
   return {
     subject: "OKKAZ — Réinitialisation du mot de passe",
     text: `Bonjour ${firstName},\n\nRéinitialisez votre mot de passe : ${link}\nCe lien expire dans 1 heure.\n`,
@@ -136,7 +136,7 @@ export function buildReviewReminderHtml(
   listingTitle: string,
   listingSlug: string,
 ): { subject: string; text: string; html: string } {
-  const link = `${env.FRONTEND_URL}/listings/${listingSlug}`;
+  const link = `${env.FRONTEND_URL[0]}/listings/${listingSlug}`;
   return {
     subject: "OKKAZ — Partagez votre avis",
     text:
