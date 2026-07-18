@@ -2,22 +2,41 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { useAuth } from "@/lib/auth";
+import type { ApiUser } from "@/lib/types";
 import styles from "./Navbar.module.css";
 
-const menuLinks = [
-  { href: "/", label: "Accueil" },
-  { href: "/annonces", label: "Biens" },
-  { href: "/vendeur", label: "Publier un bien" },
-  { href: "/contact", label: "Contact" },
-  { href: "/faq", label: "FAQ" },
-  { href: "/connexion", label: "Connexion", mobileOnly: true },
-];
+function spaceForRole(user: ApiUser): string {
+  if (user.role === "ADMIN") return "/admin";
+  if (user.role === "SELLER" || user.role === "SELLER_PRO") return "/vendeur";
+  return "/annonces";
+}
 
 export default function Navbar() {
   const pathname = usePathname();
+  const router = useRouter();
+  const { user, logout } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+
+  const menuLinks = [
+    { href: "/", label: "Accueil" },
+    { href: "/annonces", label: "Biens" },
+    { href: "/demandes", label: "Je recherche" },
+    { href: "/vendeur", label: "Publier un bien" },
+    { href: "/contact", label: "Contact" },
+    { href: "/faq", label: "FAQ" },
+    user
+      ? { href: spaceForRole(user), label: "Mon espace", mobileOnly: true }
+      : { href: "/connexion", label: "Connexion", mobileOnly: true },
+  ];
+
+  const handleLogout = async () => {
+    setIsMenuOpen(false);
+    await logout();
+    router.push("/");
+  };
 
   useEffect(() => {
     if (!isMenuOpen) {
@@ -102,9 +121,25 @@ export default function Navbar() {
             </Link>
           )}
 
-          <Link href="/connexion" className={styles.loginBtn}>
-            CONNEXION
-          </Link>
+          {user ? (
+            <>
+              <Link href={spaceForRole(user)} className={styles.loginBtn}>
+                MON ESPACE
+              </Link>
+              <button
+                type="button"
+                className={styles.loginBtn}
+                onClick={handleLogout}
+                style={{ cursor: "pointer", fontFamily: "inherit" }}
+              >
+                DÉCONNEXION
+              </button>
+            </>
+          ) : (
+            <Link href="/connexion" className={styles.loginBtn}>
+              CONNEXION
+            </Link>
+          )}
           <div className={styles.menuWrap}>
             <button
               type="button"
@@ -128,7 +163,7 @@ export default function Navbar() {
             >
               {menuLinks.map((item) => (
                 <Link
-                  key={item.href}
+                  key={`${item.href}-${item.label}`}
                   href={item.href}
                   className={item.mobileOnly ? styles.mobileOnlyLink : undefined}
                   onClick={() => setIsMenuOpen(false)}
@@ -136,6 +171,30 @@ export default function Navbar() {
                   {item.label}
                 </Link>
               ))}
+              {user && (
+                <button
+                  type="button"
+                  className={styles.mobileOnlyLink}
+                  onClick={handleLogout}
+                  style={{
+                    width: "100%",
+                    minHeight: 58,
+                    border: "none",
+                    borderRadius: 16,
+                    padding: "0 1rem",
+                    background: "transparent",
+                    color: "#171717",
+                    font: "inherit",
+                    fontSize: "0.92rem",
+                    fontWeight: 800,
+                    cursor: "pointer",
+                    textAlign: "left",
+                    alignItems: "center",
+                  }}
+                >
+                  Déconnexion
+                </button>
+              )}
             </div>
           </div>
         </div>

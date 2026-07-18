@@ -74,7 +74,7 @@ export default function TextRevealSection() {
             <Link href="/annonces" className={styles.ctaButton}>
               Trouver un bien
             </Link>
-            <Link href="/admin" className={`${styles.ctaButton} ${styles.ctaButtonSecondary}`}>
+            <Link href="/vendeur" className={`${styles.ctaButton} ${styles.ctaButtonSecondary}`}>
               Publier un bien
             </Link>
           </div>

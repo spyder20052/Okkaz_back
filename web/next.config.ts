@@ -8,6 +8,12 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: projectRoot,
   },
+  images: {
+    remotePatterns: [
+      // Images servies par le backend (uploads locaux en dev)
+      { protocol: "http", hostname: "localhost", port: "3000", pathname: "/uploads/**" },
+    ],
+  },
 };
 
 export default nextConfig;

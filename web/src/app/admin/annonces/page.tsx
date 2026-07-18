@@ -1,46 +1,119 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { mockAds } from "@/lib/data";
+import { api, ApiError, mediaUrl } from "@/lib/api";
+import {
+  formatPrice,
+  LISTING_STATUS_LABELS,
+  RENTAL_PERIOD_LABELS,
+  type DashboardStats,
+  type Listing,
+  type ListingStatus,
+} from "@/lib/types";
 import AdminShell from "../AdminShell";
 import styles from "../admin.module.css";
 
-type AdRow = (typeof mockAds)[number] & { delay?: string };
-type Filter = "all" | "urgent" | "recent";
+type Meta = { page: number; limit: number; total: number; totalPages: number };
 
-const INITIAL: AdRow[] = mockAds.slice(0, 6).map((ad, i) => ({
-  ...ad,
-  delay: ["6h", "14h", "22h", "1j", "2j (urgent)", "3j (urgent)"][i],
-}));
+const STATUS_FILTERS: ListingStatus[] = ["PENDING", "ACTIVE", "REJECTED", "PAUSED"];
+const PAGE_SIZE = 10;
+
+function submittedAgo(iso: string): string {
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const hours = Math.floor(diffMs / 3_600_000);
+  if (hours < 1) return "moins d'1h";
+  if (hours < 24) return `${hours}h`;
+  return `${Math.floor(hours / 24)}j`;
+}
 
 export default function AdminAnnoncesPage() {
-  const [pending, setPending] = useState<AdRow[]>(INITIAL);
+  const [listings, setListings] = useState<Listing[]>([]);
+  const [meta, setMeta] = useState<Meta | null>(null);
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [status, setStatus] = useState<ListingStatus>("PENDING");
+  const [page, setPage] = useState(1);
   const [query, setQuery] = useState("");
-  const [filter, setFilter] = useState<Filter>("all");
+  const [loading, setLoading] = useState(true);
+  const [feedback, setFeedback] = useState<string | null>(null);
+  const [actingId, setActingId] = useState<string | null>(null);
 
-  const stats = {
-    pending: pending.length,
-    urgent: pending.filter((a) => a.delay?.includes("urgent")).length,
-    today: 12,
-    rejected: 3,
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await api.getPaginated<Listing>("/admin/listings", {
+        status,
+        page,
+        limit: PAGE_SIZE,
+      });
+      setListings(res.data);
+      setMeta(res.meta);
+    } catch (err) {
+      setFeedback(err instanceof ApiError ? err.message : "Impossible de charger les annonces.");
+    } finally {
+      setLoading(false);
+    }
+  }, [status, page]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => void load(), 0);
+    return () => clearTimeout(timer);
+  }, [load]);
+
+  useEffect(() => {
+    api
+      .get<DashboardStats>("/admin/dashboard/stats")
+      .then((res) => setStats(res.data))
+      .catch(() => undefined);
+  }, []);
+
+  const removeFromList = (id: string) => {
+    setListings((prev) => prev.filter((l) => l.id !== id));
+    setMeta((prev) => (prev ? { ...prev, total: Math.max(0, prev.total - 1) } : prev));
   };
 
-  const approve = (id: string) => setPending((p) => p.filter((a) => a.id !== id));
-  const reject = (id: string) => setPending((p) => p.filter((a) => a.id !== id));
+  const approve = async (listing: Listing) => {
+    setActingId(listing.id);
+    setFeedback(null);
+    try {
+      await api.patch(`/admin/listings/${listing.id}/validate`);
+      removeFromList(listing.id);
+      setFeedback(`Annonce "${listing.title}" validée et publiée.`);
+    } catch (err) {
+      setFeedback(err instanceof ApiError ? err.message : "Erreur lors de la validation.");
+    } finally {
+      setActingId(null);
+    }
+  };
+
+  const reject = async (listing: Listing) => {
+    const reason = prompt(`Motif du rejet de "${listing.title}" (3 caractères minimum) :`);
+    if (reason === null) return;
+    if (reason.trim().length < 3) {
+      setFeedback("Le motif de rejet doit contenir au moins 3 caractères.");
+      return;
+    }
+    setActingId(listing.id);
+    setFeedback(null);
+    try {
+      await api.patch(`/admin/listings/${listing.id}/reject`, { rejectionReason: reason.trim() });
+      removeFromList(listing.id);
+      setFeedback(`Annonce "${listing.title}" rejetée.`);
+    } catch (err) {
+      setFeedback(err instanceof ApiError ? err.message : "Erreur lors du rejet.");
+    } finally {
+      setActingId(null);
+    }
+  };
+
   const normalizedQuery = query.trim().toLowerCase();
-  const visibleAds = pending.filter((ad) => {
-    const matchesQuery = !normalizedQuery || [ad.title, ad.category, ad.location, ad.reference]
+  const visibleAds = listings.filter((ad) => {
+    if (!normalizedQuery) return true;
+    return [ad.title, ad.category?.name ?? "", ad.locationCity, ad.owner?.firstName ?? "", ad.owner?.lastName ?? ""]
       .join(" ")
       .toLowerCase()
       .includes(normalizedQuery);
-    const matchesFilter =
-      filter === "all" ||
-      (filter === "urgent" && ad.delay?.includes("urgent")) ||
-      (filter === "recent" && ["6h", "14h", "22h"].includes(ad.delay ?? ""));
-
-    return matchesQuery && matchesFilter;
   });
 
   return (
@@ -64,32 +137,32 @@ export default function AdminAnnoncesPage() {
             <span className={styles.icon}>A</span>
             <h2>En attente</h2>
             <p>Annonces à valider</p>
-            <strong>{stats.pending}</strong>
-          </div>
-          <div className={styles.statCard}>
-            <span className={styles.icon}>!</span>
-            <h2>Urgentes</h2>
-            <p>Dépassent 48h</p>
-            <strong>{stats.urgent}</strong>
+            <strong>{stats?.pendingListingsCount ?? "…"}</strong>
           </div>
           <div className={styles.statCard}>
             <span className={styles.icon}>V</span>
-            <h2>Validées</h2>
-            <p>Aujourd&apos;hui</p>
-            <strong>{stats.today}</strong>
+            <h2>Actives</h2>
+            <p>Annonces publiées</p>
+            <strong>{stats?.totalActiveListings ?? "…"}</strong>
           </div>
           <div className={styles.statCard}>
-            <span className={styles.icon}>R</span>
-            <h2>Refusées</h2>
-            <p>Cette semaine</p>
-            <strong>{stats.rejected}</strong>
+            <span className={styles.icon}>T</span>
+            <h2>Total</h2>
+            <p>Annonces sur la plateforme</p>
+            <strong>{stats?.totalListings ?? "…"}</strong>
+          </div>
+          <div className={styles.statCard}>
+            <span className={styles.icon}>F</span>
+            <h2>Filtre actuel</h2>
+            <p>{LISTING_STATUS_LABELS[status]}</p>
+            <strong>{meta?.total ?? "…"}</strong>
           </div>
         </div>
 
         <section className={styles.card}>
           <header className={styles.cardHeader}>
             <div>
-              <h2>File de validation <span className={styles.adminModerationCount}>{visibleAds.length}</span></h2>
+              <h2>File de validation <span className={styles.adminModerationCount}>{meta?.total ?? 0}</span></h2>
               <p>Recherchez, priorisez puis validez les annonces prêtes à publier.</p>
             </div>
           </header>
@@ -103,63 +176,119 @@ export default function AdminAnnoncesPage() {
                 type="search"
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder="Titre, catégorie, ville, référence..."
+                placeholder="Titre, catégorie, ville, vendeur..."
               />
             </label>
-            <button type="button" className={`${styles.adminFilterPill} ${filter === "all" ? styles.adminFilterPillActive : ""}`} onClick={() => setFilter("all")}>
-              Toutes
-            </button>
-            <button type="button" className={`${styles.adminFilterPill} ${filter === "urgent" ? styles.adminFilterPillActive : ""}`} onClick={() => setFilter("urgent")}>
-              Urgentes
-            </button>
-            <button type="button" className={`${styles.adminFilterPill} ${filter === "recent" ? styles.adminFilterPillActive : ""}`} onClick={() => setFilter("recent")}>
-              Récentes
-            </button>
+            {STATUS_FILTERS.map((s) => (
+              <button
+                key={s}
+                type="button"
+                className={`${styles.adminFilterPill} ${status === s ? styles.adminFilterPillActive : ""}`}
+                onClick={() => {
+                  setStatus(s);
+                  setPage(1);
+                }}
+              >
+                {LISTING_STATUS_LABELS[s]}
+              </button>
+            ))}
           </div>
 
-          {visibleAds.length === 0 ? (
+          {feedback ? <p className={styles.adminModerationEmpty}>{feedback}</p> : null}
+
+          {loading ? (
+            <p className={styles.adminModerationEmpty}>Chargement des annonces...</p>
+          ) : visibleAds.length === 0 ? (
             <p className={styles.adminModerationEmpty}>Aucune annonce ne correspond aux filtres.</p>
           ) : (
             <ul className={styles.adminAdsList}>
               {visibleAds.map((ad) => (
                 <li key={ad.id} className={styles.adminAdItem}>
-                  <Image src={ad.image} alt={ad.title} width={84} height={84} className={styles.adminAdItemImg} />
+                  <Image
+                    src={mediaUrl(ad.photos?.[0]?.url)}
+                    alt={ad.title}
+                    width={84}
+                    height={84}
+                    className={styles.adminAdItemImg}
+                    unoptimized
+                  />
                   <div className={styles.adminAdMain}>
                     <div className={styles.adminAdTitleRow}>
                       <strong>{ad.title}</strong>
-                      <span className={`${styles.adminAdDelay} ${ad.delay?.includes("urgent") ? styles.adminAdDelay_urgent : ""}`}>
-                        {ad.delay?.includes("urgent") ? "Urgent" : "En attente"}
+                      <span className={`${styles.adminAdDelay} ${ad.isUrgent ? styles.adminAdDelay_urgent : ""}`}>
+                        {ad.isUrgent ? "Urgent" : LISTING_STATUS_LABELS[ad.status]}
                       </span>
                     </div>
-                    <p>{ad.category} · {ad.location} · {ad.reference}</p>
+                    <p>
+                      {ad.category?.name ?? "Sans catégorie"} · {ad.locationCity}
+                      {ad.owner ? ` · ${ad.owner.firstName} ${ad.owner.lastName}` : ""}
+                    </p>
                     <div className={styles.adminAdMetaGrid}>
                       <span>
                         <small>Prix</small>
-                        {ad.price.toLocaleString("fr-FR")} FCFA
+                        {formatPrice(ad.rentalPrice)} / {RENTAL_PERIOD_LABELS[ad.rentalPeriod]}
                       </span>
                       <span>
                         <small>Soumission</small>
-                        Il y a {ad.delay}
+                        Il y a {submittedAgo(ad.createdAt)}
                       </span>
                       <span>
                         <small>Mode</small>
-                        {ad.loaPossible ? "Achat / Vente" : "Location"}
+                        {ad.purchasePrice ? "Location / Achat" : "Location"}
                       </span>
                     </div>
                   </div>
                   <div className={styles.adminModerationActions}>
                     <Link href={`/annonces/${ad.id}?from=admin-annonces`} className={styles.adminActionSecondary}>Voir</Link>
-                    <button type="button" className={`${styles.adminActionPrimary} ${styles.adminActionPrimary_blue}`} onClick={() => approve(ad.id)}>
-                      Valider
-                    </button>
-                    <button type="button" className={`${styles.adminActionPrimary} ${styles.adminActionPrimary_red}`} onClick={() => reject(ad.id)}>
-                      Refuser
-                    </button>
+                    {ad.status !== "ACTIVE" ? (
+                      <button
+                        type="button"
+                        className={`${styles.adminActionPrimary} ${styles.adminActionPrimary_blue}`}
+                        disabled={actingId === ad.id}
+                        onClick={() => void approve(ad)}
+                      >
+                        Valider
+                      </button>
+                    ) : null}
+                    {ad.status !== "REJECTED" ? (
+                      <button
+                        type="button"
+                        className={`${styles.adminActionPrimary} ${styles.adminActionPrimary_red}`}
+                        disabled={actingId === ad.id}
+                        onClick={() => void reject(ad)}
+                      >
+                        Refuser
+                      </button>
+                    ) : null}
                   </div>
                 </li>
               ))}
             </ul>
           )}
+
+          {meta && meta.totalPages > 1 ? (
+            <div className={styles.buttonRow} style={{ marginTop: 16 }}>
+              <button
+                type="button"
+                className={styles.adminActionSecondary}
+                disabled={page <= 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+              >
+                Page précédente
+              </button>
+              <span style={{ alignSelf: "center", fontWeight: 800, fontSize: "0.82rem" }}>
+                Page {meta.page} / {meta.totalPages}
+              </span>
+              <button
+                type="button"
+                className={styles.adminActionSecondary}
+                disabled={page >= meta.totalPages}
+                onClick={() => setPage((p) => p + 1)}
+              >
+                Page suivante
+              </button>
+            </div>
+          ) : null}
         </section>
       </section>
     </AdminShell>

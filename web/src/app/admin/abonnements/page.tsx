@@ -1,106 +1,110 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { readPlatformEvents, writePlatformEvents, type PlatformEvent } from "@/lib/platformEvents";
+import { api, ApiError } from "@/lib/api";
+import {
+  formatPrice,
+  type Payment,
+  type SubscriptionPlan,
+  type SubscriptionPlanInfo,
+} from "@/lib/types";
 import AdminShell from "../AdminShell";
 import styles from "../admin.module.css";
 
-type Plan = {
-  id: string;
-  name: string;
-  price: string;
-  cadence: string;
-  rule: string;
-  enabled: boolean;
+type Meta = { page: number; limit: number; total: number; totalPages: number };
+
+const PLAN_LABELS: Record<SubscriptionPlan, string> = {
+  WEEKLY: "Premium semaine",
+  MONTHLY: "Premium mois",
 };
 
-type Subscription = {
-  id: string;
-  owner: string;
-  planId: string;
-  status: "actif" | "pause" | "expire";
-  nextBilling: string;
-  amount: number;
+const PLAN_SETTING_KEY: Record<SubscriptionPlan, string> = {
+  WEEKLY: "subscription_weekly_price",
+  MONTHLY: "subscription_monthly_price",
 };
 
-const initialPlans: Plan[] = [
-  { id: "free", name: "Gratuit", price: "0", cadence: "Toujours", rule: "4 photos, validation sous 72h", enabled: true },
-  { id: "week", name: "Premium semaine", price: "3000", cadence: "Hebdomadaire", rule: "Validation express et badge prioritaire", enabled: true },
-  { id: "month", name: "Premium mois", price: "10000", cadence: "Mensuel", rule: "Badge Pro, photos illimitees, mise en avant", enabled: true },
-  { id: "boost", name: "Boost annonce", price: "5000", cadence: "Ponctuel", rule: "Remontee prioritaire d'une annonce pendant 7 jours", enabled: true },
-  { id: "owner", name: "Compte beneficiaire", price: "1000", cadence: "Mensuel", rule: "Reception de prospects et profil enrichi", enabled: false },
-];
+const PAYMENT_STATUS_LABELS: Record<Payment["status"], string> = {
+  PENDING: "En attente",
+  SUCCESS: "Encaissé",
+  FAILED: "Échec",
+  REFUNDED: "Remboursé",
+};
 
-const initialSubscriptions: Subscription[] = [
-  { id: "SUB-1042", owner: "Immo Benin SARL", planId: "month", status: "actif", nextBilling: "02 juin 2026", amount: 10000 },
-  { id: "SUB-1039", owner: "Garage Aplahoue", planId: "week", status: "actif", nextBilling: "30 mai 2026", amount: 3000 },
-  { id: "SUB-1031", owner: "Emma TODEDJI", planId: "owner", status: "pause", nextBilling: "En attente", amount: 1000 },
-  { id: "SUB-1027", owner: "Studio Porto-Novo", planId: "month", status: "expire", nextBilling: "Expire hier", amount: 10000 },
-];
-
-const statusLabel = {
-  actif: "Actif",
-  pause: "En pause",
-  expire: "Expire",
+const PAYMENT_STATUS_STYLE: Record<Payment["status"], "ok" | "wait" | "fail"> = {
+  SUCCESS: "ok",
+  PENDING: "wait",
+  FAILED: "fail",
+  REFUNDED: "wait",
 };
 
 export default function AdminAbonnementsPage() {
-  const [plans, setPlans] = useState<Plan[]>(initialPlans);
-  const [subscriptions, setSubscriptions] = useState<Subscription[]>(initialSubscriptions);
-  const [events, setEvents] = useState<PlatformEvent[]>(() => readPlatformEvents());
-  const [query, setQuery] = useState("");
+  const [plans, setPlans] = useState<SubscriptionPlanInfo[]>([]);
+  const [priceDrafts, setPriceDrafts] = useState<Record<string, string>>({});
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [meta, setMeta] = useState<Meta | null>(null);
+  const [page, setPage] = useState(1);
+  const [loading, setLoading] = useState(true);
+  const [feedback, setFeedback] = useState<string | null>(null);
+  const [savingPlan, setSavingPlan] = useState<SubscriptionPlan | null>(null);
 
-  const activeSubscriptions = subscriptions.filter((sub) => sub.status === "actif").length;
-  const monthlyRevenue = subscriptions
-    .filter((sub) => sub.status === "actif")
-    .reduce((total, sub) => total + sub.amount, 0);
-  const filteredSubscriptions = subscriptions.filter((sub) => {
-    const plan = plans.find((item) => item.id === sub.planId);
-    return [sub.owner, sub.id, plan?.name].join(" ").toLowerCase().includes(query.trim().toLowerCase());
-  });
+  const loadPlans = useCallback(async () => {
+    try {
+      const res = await api.get<{ plans: SubscriptionPlanInfo[] }>("/subscriptions/plans", undefined, false);
+      setPlans(res.data.plans);
+      setPriceDrafts(Object.fromEntries(res.data.plans.map((p) => [p.plan, String(p.price)])));
+    } catch (err) {
+      setFeedback(err instanceof ApiError ? err.message : "Impossible de charger les plans.");
+    }
+  }, []);
 
-  const planById = useMemo(() => new Map(plans.map((plan) => [plan.id, plan])), [plans]);
-
-  const updatePlan = (id: string, patch: Partial<Plan>) => {
-    setPlans((current) => current.map((plan) => (plan.id === id ? { ...plan, ...patch } : plan)));
-  };
-
-  const setSubscriptionStatus = (id: string, status: Subscription["status"]) => {
-    setSubscriptions((current) => current.map((sub) => (sub.id === id ? { ...sub, status } : sub)));
-  };
-
-  const grantSubscription = (event: PlatformEvent) => {
-    const nextEvents = events.map((item) => (item.id === event.id ? { ...item, status: "approved" as const } : item));
-    setEvents(nextEvents);
-    writePlatformEvents(nextEvents);
-    if (event.type === "boost_payment") return;
-    setSubscriptions((current) => [
-      {
-        id: `SUB-${Date.now().toString().slice(-4)}`,
-        owner: event.detail.split(" a paye")[0] || "Client OKKAZ",
-        planId: event.title.includes("semaine") ? "week" : event.title.includes("beneficiaire") ? "owner" : event.title.includes("Boost") ? "boost" : "month",
-        status: "actif",
-        nextBilling: "Prochain renouvellement",
-        amount: event.amount ?? 0,
-      },
-      ...current,
-    ]);
-  };
-
-  const pendingSubscriptionPayments = events.filter((event) => (event.type === "subscription_payment" || event.type === "boost_payment") && event.status === "pending");
+  const loadPayments = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await api.getPaginated<Payment>("/admin/payments", {
+        type: "SUBSCRIPTION",
+        page,
+        limit: 10,
+      });
+      setPayments(res.data);
+      setMeta(res.meta);
+    } catch (err) {
+      setFeedback(err instanceof ApiError ? err.message : "Impossible de charger les paiements d'abonnement.");
+    } finally {
+      setLoading(false);
+    }
+  }, [page]);
 
   useEffect(() => {
-    const syncEvents = () => setEvents(readPlatformEvents());
+    const timer = setTimeout(() => void loadPlans(), 0);
+    return () => clearTimeout(timer);
+  }, [loadPlans]);
 
-    window.addEventListener("okkaz-events-updated", syncEvents);
-    window.addEventListener("storage", syncEvents);
+  useEffect(() => {
+    const timer = setTimeout(() => void loadPayments(), 0);
+    return () => clearTimeout(timer);
+  }, [loadPayments]);
 
-    return () => {
-      window.removeEventListener("okkaz-events-updated", syncEvents);
-      window.removeEventListener("storage", syncEvents);
-    };
-  }, []);
+  const savePlanPrice = async (plan: SubscriptionPlanInfo) => {
+    const draft = (priceDrafts[plan.plan] ?? "").trim();
+    if (!draft || Number.isNaN(Number(draft)) || Number(draft) <= 0) {
+      setFeedback("Le tarif doit être un nombre positif.");
+      return;
+    }
+    setSavingPlan(plan.plan);
+    setFeedback(null);
+    try {
+      await api.patch(`/admin/settings/${PLAN_SETTING_KEY[plan.plan]}`, { value: draft });
+      setPlans((prev) => prev.map((p) => (p.plan === plan.plan ? { ...p, price: Number(draft) } : p)));
+      setFeedback(`Tarif ${PLAN_LABELS[plan.plan]} mis à jour : ${formatPrice(draft)}.`);
+    } catch (err) {
+      setFeedback(err instanceof ApiError ? err.message : "Erreur lors de la mise à jour du tarif.");
+    } finally {
+      setSavingPlan(null);
+    }
+  };
+
+  const successCount = payments.filter((p) => p.status === "SUCCESS").length;
 
   return (
     <AdminShell active="/admin/abonnements">
@@ -113,37 +117,39 @@ export default function AdminAbonnementsPage() {
           </Link>
           <header className={styles.pageHeaderTitle}>
             <h1>Abonnements</h1>
-            <p>Gestion des offres premium, des comptes beneficiaires et des renouvellements.</p>
+            <p>Gestion des offres premium vendeur et suivi des paiements d&apos;abonnement.</p>
           </header>
           <Link href="/admin/paiements" className={styles.headerCta}>
             Paiements
           </Link>
         </div>
 
+        {feedback ? <p className={styles.adminModerationEmpty}>{feedback}</p> : null}
+
         <div className={styles.stats}>
           <div className={styles.statCard}>
             <span className={styles.icon}>P</span>
-            <h2>Plans actifs</h2>
-            <p>Offres commercialisees</p>
-            <strong>{plans.filter((plan) => plan.enabled).length}</strong>
+            <h2>Plans</h2>
+            <p>Offres commercialisées</p>
+            <strong>{plans.length}</strong>
           </div>
           <div className={styles.statCard}>
             <span className={styles.icon}>A</span>
-            <h2>Abonnes</h2>
-            <p>Comptes premium actifs</p>
-            <strong>{activeSubscriptions}</strong>
+            <h2>Paiements abo</h2>
+            <p>Total enregistrés</p>
+            <strong>{meta?.total ?? "…"}</strong>
           </div>
           <div className={styles.statCard}>
             <span className={styles.icon}>F</span>
-            <h2>MRR</h2>
-            <p>Revenu recurrent estime</p>
-            <strong>{monthlyRevenue.toLocaleString("fr-FR")}</strong>
+            <h2>Encaissés</h2>
+            <p>Sur cette page</p>
+            <strong>{successCount}</strong>
           </div>
           <div className={styles.statCard}>
             <span className={styles.icon}>!</span>
-            <h2>A traiter</h2>
-            <p>Expirations ou pauses</p>
-            <strong>{subscriptions.filter((sub) => sub.status !== "actif").length}</strong>
+            <h2>En attente</h2>
+            <p>Paiements non confirmés</p>
+            <strong>{payments.filter((p) => p.status === "PENDING").length}</strong>
           </div>
         </div>
 
@@ -152,28 +158,34 @@ export default function AdminAbonnementsPage() {
             <header className={styles.cardHeader}>
               <div>
                 <h2>Plans disponibles</h2>
-                <p>Modifiez les tarifs et activez les offres visibles côté vendeur.</p>
+                <p>Modifiez les tarifs appliqués côté vendeur (réglages système).</p>
               </div>
             </header>
 
             <div className={styles.planList}>
               {plans.map((plan) => (
-                <article className={styles.planCard} key={plan.id}>
+                <article className={styles.planCard} key={plan.plan}>
                   <div>
-                    <strong>{plan.name}</strong>
-                    <p>{plan.rule}</p>
-                    <span>{plan.cadence}</span>
+                    <strong>{PLAN_LABELS[plan.plan]}</strong>
+                    <p>Durée : {plan.durationDays} jours · devise {plan.currency}</p>
+                    <span>{plan.plan === "WEEKLY" ? "Hebdomadaire" : "Mensuel"}</span>
                   </div>
                   <label>
                     Tarif FCFA
-                    <input value={plan.price} onChange={(event) => updatePlan(plan.id, { price: event.target.value })} />
+                    <input
+                      value={priceDrafts[plan.plan] ?? ""}
+                      onChange={(event) =>
+                        setPriceDrafts((prev) => ({ ...prev, [plan.plan]: event.target.value }))
+                      }
+                    />
                   </label>
                   <button
                     type="button"
-                    className={plan.enabled ? styles.adminActionSecondary : `${styles.adminActionPrimary} ${styles.adminActionPrimary_blue}`}
-                    onClick={() => updatePlan(plan.id, { enabled: !plan.enabled })}
+                    className={`${styles.adminActionPrimary} ${styles.adminActionPrimary_blue}`}
+                    disabled={savingPlan === plan.plan}
+                    onClick={() => void savePlanPrice(plan)}
                   >
-                    {plan.enabled ? "Desactiver" : "Activer"}
+                    {savingPlan === plan.plan ? "Enregistrement..." : "Enregistrer"}
                   </button>
                 </article>
               ))}
@@ -188,7 +200,7 @@ export default function AdminAbonnementsPage() {
               </div>
             </header>
             <div className={styles.stepList}>
-              <span>Validation prioritaire des annonces premium</span>
+              <span>Photos supplémentaires pour les vendeurs abonnés</span>
               <span>Badge visible sur les fiches publiques</span>
               <span>Encaissement abonnement par OKKAZ</span>
               <span>Suspension automatique apres expiration</span>
@@ -196,81 +208,63 @@ export default function AdminAbonnementsPage() {
           </aside>
         </section>
 
-        {pendingSubscriptionPayments.length > 0 && (
-          <section className={styles.card}>
-            <header className={styles.cardHeader}>
-              <div>
-                <h2>Paiements à accorder <span className={styles.adminModerationCount}>{pendingSubscriptionPayments.length}</span></h2>
-                <p>Quand un utilisateur paie un abonnement ou le boost d&apos;une annonce, OKKAZ reçoit la notification ici.</p>
-              </div>
-            </header>
-            <div className={styles.subscriptionList}>
-              {pendingSubscriptionPayments.map((event) => (
-                <article className={styles.subscriptionRow} key={event.id}>
-                  <span className={`${styles.adminUserStatus} ${styles.adminUserStatus_wait}`}>Payé</span>
-                  <div>
-                    <strong>{event.title}</strong>
-                    <p>{event.detail}</p>
-                  </div>
-                  <em>{(event.amount ?? 0).toLocaleString("fr-FR")} FCFA</em>
-                  <div className={styles.adminModerationActions}>
-                    <button type="button" className={`${styles.adminActionPrimary} ${styles.adminActionPrimary_blue}`} onClick={() => grantSubscription(event)}>
-                      Accorder
-                    </button>
-                  </div>
-                </article>
-              ))}
-            </div>
-          </section>
-        )}
-
         <section className={styles.card}>
           <header className={styles.cardHeader}>
             <div>
-              <h2>Abonnes et renouvellements</h2>
-              <p>Suivi des proprietaires premium et actions de statut.</p>
+              <h2>Paiements d&apos;abonnement <span className={styles.adminModerationCount}>{meta?.total ?? 0}</span></h2>
+              <p style={{ color: "#b45309", fontWeight: 700 }}>
+                Liste dérivée des paiements — endpoint abonnements admin manquant côté backend.
+              </p>
             </div>
           </header>
 
-          <div className={styles.adminFilterBar}>
-            <label className={styles.adminSearchInline}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="11" cy="11" r="8" />
-                <line x1="21" y1="21" x2="16.65" y2="16.65" />
-              </svg>
-              <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Proprietaire, plan, reference..." />
-            </label>
-          </div>
-
-          <div className={styles.subscriptionList}>
-            {filteredSubscriptions.map((sub) => {
-              const plan = planById.get(sub.planId);
-
-              return (
-                <article className={styles.subscriptionRow} key={sub.id}>
-                  <span className={`${styles.adminUserStatus} ${sub.status === "actif" ? styles.adminUserStatus_ok : sub.status === "pause" ? styles.adminUserStatus_wait : styles.adminUserStatus_fail}`}>
-                    {statusLabel[sub.status]}
+          {loading ? (
+            <p className={styles.adminModerationEmpty}>Chargement...</p>
+          ) : payments.length === 0 ? (
+            <p className={styles.adminModerationEmpty}>Aucun paiement d&apos;abonnement enregistré.</p>
+          ) : (
+            <div className={styles.subscriptionList}>
+              {payments.map((payment) => (
+                <article className={styles.subscriptionRow} key={payment.id}>
+                  <span className={`${styles.adminUserStatus} ${styles[`adminUserStatus_${PAYMENT_STATUS_STYLE[payment.status]}`]}`}>
+                    {PAYMENT_STATUS_LABELS[payment.status]}
                   </span>
                   <div>
-                    <strong>{sub.owner}</strong>
-                    <p>{sub.id} · {plan?.name ?? "Plan inconnu"} · {sub.amount.toLocaleString("fr-FR")} FCFA</p>
+                    <strong>{payment.user ? `${payment.user.firstName} ${payment.user.lastName}` : "Utilisateur inconnu"}</strong>
+                    <p>
+                      {payment.user?.email ?? ""} · {payment.method === "MOBILE_MONEY" ? "Mobile Money" : "Carte"} ·{" "}
+                      {new Date(payment.createdAt).toLocaleDateString("fr-FR")}
+                    </p>
                   </div>
-                  <em>{sub.nextBilling}</em>
-                  <div className={styles.adminModerationActions}>
-                    <button type="button" className={styles.adminActionSecondary} onClick={() => setSubscriptionStatus(sub.id, "pause")}>
-                      Pause
-                    </button>
-                    <button type="button" className={`${styles.adminActionPrimary} ${styles.adminActionPrimary_blue}`} onClick={() => setSubscriptionStatus(sub.id, "actif")}>
-                      Activer
-                    </button>
-                    <button type="button" className={`${styles.adminActionPrimary} ${styles.adminActionPrimary_red}`} onClick={() => setSubscriptionStatus(sub.id, "expire")}>
-                      Expirer
-                    </button>
-                  </div>
+                  <em>{formatPrice(payment.amount)}</em>
                 </article>
-              );
-            })}
-          </div>
+              ))}
+            </div>
+          )}
+
+          {meta && meta.totalPages > 1 ? (
+            <div className={styles.buttonRow} style={{ marginTop: 16 }}>
+              <button
+                type="button"
+                className={styles.adminActionSecondary}
+                disabled={page <= 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+              >
+                Page précédente
+              </button>
+              <span style={{ alignSelf: "center", fontWeight: 800, fontSize: "0.82rem" }}>
+                Page {meta.page} / {meta.totalPages}
+              </span>
+              <button
+                type="button"
+                className={styles.adminActionSecondary}
+                disabled={page >= meta.totalPages}
+                onClick={() => setPage((p) => p + 1)}
+              >
+                Page suivante
+              </button>
+            </div>
+          ) : null}
         </section>
       </section>
     </AdminShell>

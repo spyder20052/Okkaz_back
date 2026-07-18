@@ -516,6 +516,106 @@
   line-height: 1.3;
 }
 
+/* ─── MESSAGES FORMULAIRES ─── */
+
+.formError {
+  margin: 0.4rem 0 0;
+  border-radius: 10px;
+  padding: 0.65rem 0.85rem;
+  background: rgba(220, 38, 38, 0.08);
+  color: #b91c1c;
+  font-size: 0.8rem;
+  font-weight: 650;
+  line-height: 1.4;
+}
+
+.formInfo {
+  margin: 0.4rem 0 0;
+  border-radius: 10px;
+  padding: 0.65rem 0.85rem;
+  background: rgba(22, 163, 74, 0.08);
+  color: #15803d;
+  font-size: 0.8rem;
+  font-weight: 650;
+  line-height: 1.4;
+}
+
+/* ─── SIGNALEMENT ─── */
+
+.reportToggle {
+  background: none;
+  border: none;
+  padding: 0;
+  color: rgba(17, 17, 17, 0.5);
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: underline;
+  transition: color 0.15s ease;
+}
+
+.reportToggle:hover {
+  color: #b91c1c;
+}
+
+.reportForm {
+  margin-top: 0.75rem;
+  padding: 1rem;
+  border: 1px solid rgba(17, 17, 17, 0.1);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.reportForm label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: rgba(17, 17, 17, 0.5);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.reportForm select,
+.reportForm textarea {
+  border: 1px solid rgba(17, 17, 17, 0.12);
+  border-radius: 10px;
+  padding: 0.6rem 0.75rem;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 550;
+  color: #111111;
+  background: #ffffff;
+  outline: none;
+}
+
+.reportForm select:focus,
+.reportForm textarea:focus {
+  border-color: #111111;
+}
+
+.reportForm button {
+  align-self: flex-start;
+  min-height: 2.5rem;
+  padding: 0 1.1rem;
+  border-radius: 10px;
+  border: none;
+  background: #111111;
+  color: #ffffff;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 760;
+  cursor: pointer;
+}
+
+.reportForm button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 /* ─── MISSING ─── */
 
 .missing {
@@ -913,4 +1013,252 @@
   font-weight: 860;
   color: #111111;
   letter-spacing: -0.02em;
+}
+
+.requestDetailLayout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 0.42fr);
+  gap: clamp(1.4rem, 3vw, 2.5rem);
+  align-items: start;
+}
+
+.requestDetailMain {
+  display: grid;
+  gap: 2rem;
+}
+
+.requestHeroCard {
+  display: grid;
+  gap: 1rem;
+  border-radius: 18px;
+  padding: clamp(1.2rem, 3vw, 2rem);
+  background: #f7f8f8;
+  border: 1px solid rgba(17, 17, 17, 0.08);
+}
+
+.requestDescription {
+  margin: 0;
+  max-width: 760px;
+  color: rgba(17, 17, 17, 0.66);
+  font-size: clamp(0.96rem, 1.2vw, 1.08rem);
+  font-weight: 560;
+  line-height: 1.6;
+}
+
+.requestStats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.7rem;
+  margin-top: 0.4rem;
+}
+
+.requestStats div {
+  min-height: 5rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.35rem;
+  border-radius: 12px;
+  padding: 0.85rem 1rem;
+  background: #ffffff;
+  border: 1px solid rgba(17, 17, 17, 0.07);
+}
+
+.requestStats span,
+.requestReplyPanel label span {
+  color: rgba(17, 17, 17, 0.45);
+  font-size: 0.68rem;
+  font-weight: 820;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.requestStats strong {
+  color: #111111;
+  font-size: 0.92rem;
+  font-weight: 780;
+  line-height: 1.2;
+}
+
+.requestReplyPanel {
+  position: sticky;
+  top: 6rem;
+  border-radius: 18px;
+  padding: clamp(1.1rem, 2vw, 1.4rem);
+  background: #111111;
+  color: #ffffff;
+}
+
+.requestReplyPanel .optionLabel {
+  color: rgba(255, 255, 255, 0.52);
+}
+
+.requestReplyPanel h2 {
+  margin: -0.4rem 0 1.1rem;
+  color: #ffffff;
+  font-size: 1.45rem;
+  font-weight: 780;
+  letter-spacing: -0.04em;
+}
+
+.requestReplyPanel form {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.requestReplyPanel label {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.requestReplyPanel label span {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.requestReplyPanel input,
+.requestReplyPanel textarea {
+  width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 10px;
+  padding: 0.78rem 0.9rem;
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 620;
+  outline: none;
+}
+
+.requestReplyPanel textarea {
+  resize: vertical;
+}
+
+.requestReplyPanel input::placeholder,
+.requestReplyPanel textarea::placeholder {
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.requestReplyPanel button {
+  min-height: 3rem;
+  border: none;
+  border-radius: 10px;
+  background: var(--accent);
+  color: #ffffff;
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 820;
+  cursor: pointer;
+}
+
+.offerList {
+  display: grid;
+  gap: 0.75rem;
+  max-width: 900px;
+}
+
+.offerCard {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 1rem;
+  align-items: center;
+  border: 1px solid rgba(17, 17, 17, 0.08);
+  border-radius: 14px;
+  padding: 1rem;
+  background: #ffffff;
+}
+
+.offerCard span {
+  display: block;
+  margin-bottom: 0.35rem;
+  color: rgba(17, 17, 17, 0.42);
+  font-size: 0.72rem;
+  font-weight: 760;
+}
+
+.offerCard h3 {
+  margin: 0;
+  color: #111111;
+  font-size: 0.98rem;
+  font-weight: 780;
+  letter-spacing: -0.02em;
+}
+
+.offerCard p {
+  margin: 0.4rem 0 0;
+  color: rgba(17, 17, 17, 0.62);
+  font-size: 0.84rem;
+  font-weight: 540;
+  line-height: 1.45;
+}
+
+.offerAside {
+  display: grid;
+  justify-items: end;
+  gap: 0.5rem;
+}
+
+.offerAside strong {
+  color: #111111;
+  font-size: 0.9rem;
+  font-weight: 860;
+  white-space: nowrap;
+}
+
+.offerAside a {
+  min-height: 2.35rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 0 0.9rem;
+  background: #111111;
+  color: #ffffff;
+  font-size: 0.74rem;
+  font-weight: 820;
+  text-decoration: none;
+}
+
+.formError,
+.formSuccess {
+  margin: 0;
+  border-radius: 10px;
+  padding: 0.75rem 0.85rem;
+  font-size: 0.78rem;
+  font-weight: 720;
+  line-height: 1.35;
+}
+
+.formError {
+  background: rgba(239, 68, 68, 0.16);
+  color: #fecaca;
+}
+
+.formSuccess {
+  background: rgba(34, 197, 94, 0.16);
+  color: #bbf7d0;
+}
+
+@media (max-width: 980px) {
+  .requestDetailLayout {
+    grid-template-columns: 1fr;
+  }
+
+  .requestReplyPanel {
+    position: static;
+  }
+
+  .requestStats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .requestStats,
+  .offerCard {
+    grid-template-columns: 1fr;
+  }
+
+  .offerAside {
+    justify-items: stretch;
+  }
 }

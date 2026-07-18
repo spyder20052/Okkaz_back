@@ -1,6 +1,13 @@
+"use client";
+
+import { useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/lib/auth";
 import styles from "./vendeur.module.css";
+
+const ALLOWED_ROLES = ["SELLER", "SELLER_PRO", "ADMIN"];
 
 type SellerShellProps = {
   active: string;
@@ -8,6 +15,32 @@ type SellerShellProps = {
 };
 
 export default function SellerShell({ children }: SellerShellProps) {
+  const { user, isLoading, logout } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!isLoading && (!user || !ALLOWED_ROLES.includes(user.role))) {
+      router.push("/connexion");
+    }
+  }, [isLoading, user, router]);
+
+  const handleLogout = async () => {
+    await logout();
+    router.push("/connexion");
+  };
+
+  if (isLoading || !user || !ALLOWED_ROLES.includes(user.role)) {
+    return (
+      <main className={styles.profilePage}>
+        <div style={{ padding: 60, textAlign: "center", color: "var(--muted, #6b7280)" }}>
+          Vérification de votre session...
+        </div>
+      </main>
+    );
+  }
+
+  const initials = `${user.firstName?.[0] ?? ""}${user.lastName?.[0] ?? ""}`.toUpperCase() || "OK";
+
   return (
     <main className={styles.profilePage}>
       <header className={styles.profileTopBar}>
@@ -29,12 +62,12 @@ export default function SellerShell({ children }: SellerShellProps) {
               <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
             </svg>
           </Link>
+          {/* Écart backend : pas d'API notifications → badge retiré, cloche décorative. */}
           <button type="button" className={`${styles.profileIconBtn} ${styles.profileBellBtn}`} aria-label="Notifications">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
               <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
             </svg>
-            <span className={styles.profileBellBadge}>2</span>
           </button>
           <Link href="/faq" className={styles.profileIconBtn} aria-label="Aide">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -44,16 +77,16 @@ export default function SellerShell({ children }: SellerShellProps) {
             </svg>
           </Link>
           <Link href="/vendeur" className={styles.profileAvatarBtn} aria-label="Mon profil">
-            <span>ET</span>
+            <span>{initials}</span>
           </Link>
-          <Link href="/connexion" className={styles.profileLogoutBtn} aria-label="Déconnexion" title="Déconnexion">
+          <button type="button" onClick={handleLogout} className={styles.profileLogoutBtn} style={{ border: "none", cursor: "pointer" }} aria-label="Déconnexion" title="Déconnexion">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
               <polyline points="16 17 21 12 16 7" />
               <line x1="21" y1="12" x2="9" y2="12" />
             </svg>
             <span>Déconnexion</span>
-          </Link>
+          </button>
         </div>
       </header>
       {children}

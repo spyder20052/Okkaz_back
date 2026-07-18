@@ -1,264 +1,341 @@
 "use client";
 
-import { Suspense, useState } from "react";
-import Image from "next/image";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { mockAds } from "@/lib/data";
-import { pushPlatformEvent } from "@/lib/platformEvents";
-import { pushSearchRequest } from "@/lib/searchRequests";
+import { api, ApiError } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
+import { openKkiapay, pollPaymentStatus } from "@/lib/kkiapay";
+import type { Payment, Subscription, SubscriptionPlan, SubscriptionPlanInfo } from "@/lib/types";
 import styles from "./paiement.module.css";
 
-const PENDING_SEARCH_REQUEST_KEY = "okkaz_pending_search_request";
+type Phase = "idle" | "initiating" | "widget" | "polling" | "success" | "pending" | "failed";
 
-const savedProfile = {
-  firstName: "Jean",
-  lastName: "Dupont",
-  phone: "+229 01 00 00 00 00",
-  card: "Carte bancaire enregistrée •••• 2842",
+const PLAN_LABELS: Record<SubscriptionPlan, string> = {
+  WEEKLY: "Premium hebdomadaire",
+  MONTHLY: "Premium mensuel",
 };
+
+function fcfa(value: number | string): string {
+  return `${Number(value).toLocaleString("fr-FR")} FCFA`;
+}
+
+// Écran de statut post-widget partagé entre les flux.
+function PaymentStatusBox({ phase, backHref }: { phase: Phase; backHref: string }) {
+  if (phase === "polling") {
+    return (
+      <div className={styles.revealBox}>
+        <span>Vérification en cours...</span>
+        <strong>Paiement transmis à KKiaPay</strong>
+        <p>Nous vérifions la confirmation du paiement auprès du serveur (quelques secondes).</p>
+      </div>
+    );
+  }
+  if (phase === "success") {
+    return (
+      <div className={styles.revealBox}>
+        <span>Paiement confirmé !</span>
+        <strong>Merci, votre paiement a été validé.</strong>
+        <p>Le service est activé sur votre compte.</p>
+        <Link href={backHref} className={styles.chatLink}>Retour à mon espace</Link>
+      </div>
+    );
+  }
+  if (phase === "pending") {
+    return (
+      <div className={styles.revealBox}>
+        <span>Paiement transmis</span>
+        <strong>Confirmation en attente</strong>
+        <p>
+          Le paiement a bien été transmis. La confirmation finale arrive via le webhook KKiaPay
+          (non joignable en environnement local, le statut reste donc « en attente » en développement).
+          Le service sera activé dès réception de la confirmation.
+        </p>
+        <Link href={backHref} className={styles.chatLink}>Retour à mon espace</Link>
+      </div>
+    );
+  }
+  if (phase === "failed") {
+    return (
+      <div className={styles.revealBox}>
+        <span>Paiement échoué</span>
+        <strong>Le paiement n&apos;a pas abouti</strong>
+        <p>Aucun montant n&apos;a été débité. Vous pouvez réessayer.</p>
+      </div>
+    );
+  }
+  return null;
+}
 
 function PaiementContent() {
   const searchParams = useSearchParams();
+  const { user, isLoading: authLoading } = useAuth();
   const paymentType = searchParams.get("type");
-  const plan = searchParams.get("plan") ?? "Premium mois";
-  const ad = mockAds.find((item) => item.id === searchParams.get("annonce")) ?? mockAds[0];
-  const [isPaid, setIsPaid] = useState(false);
   const isSubscription = paymentType === "abonnement";
-  const isBoost = paymentType === "boost";
-  const isSearchUrgency = paymentType === "recherche";
-  const isDirectNumber = paymentType === "direct_number";
-  const subscriptionAmount = plan.includes("semaine") ? 3000 : plan.includes("beneficiaire") ? 1000 : 10000;
-  const boostAmount = 5000;
-  const searchAmount = searchParams.get("urgence") === "Express" ? 5000 : 2500;
-  const directNumberAmount = 2500;
-  const total = isSubscription
-    ? subscriptionAmount
-    : isBoost
-    ? boostAmount
-    : isSearchUrgency
-    ? searchAmount
-    : isDirectNumber
-    ? directNumberAmount
-    : ad.price + ad.deposit;
-  const backHref = isSubscription || isBoost || isDirectNumber ? "/vendeur" : isSearchUrgency ? "/vendeur/recherches/nouvelle" : "/annonces";
-  const backLabel = isSubscription || isBoost || isDirectNumber ? "Retour au dashboard" : isSearchUrgency ? "Retour au formulaire" : "Retour aux annonces";
-  const secureCopy = isSubscription
-    ? "Paiement sécurisé par OKKAZ. L'abonnement est accordé depuis le back-office après validation."
-    : isBoost
-    ? "Paiement sécurisé par OKKAZ. Le boost est appliqué uniquement à cette annonce après validation admin."
-    : isSearchUrgency
-    ? "Paiement sécurisé par OKKAZ. La demande Express est publiée après confirmation."
-    : isDirectNumber
-    ? "Paiement sécurisé par OKKAZ. L'affichage de votre numéro direct sera activé après confirmation."
-    : "Paiement sécurisé par OKKAZ. Votre réservation est enregistrée en toute sécurité.";
+  const isSearchDemand = paymentType === "recherche";
 
-  const confirmPayment = () => {
-    setIsPaid(true);
-    if (isSearchUrgency) {
-      const raw = window.localStorage.getItem(PENDING_SEARCH_REQUEST_KEY);
-      if (raw) {
-        const request = pushSearchRequest(JSON.parse(raw));
-        window.localStorage.removeItem(PENDING_SEARCH_REQUEST_KEY);
-        pushPlatformEvent({
-          type: "search_request",
-          title: "Demande Je recherche Express payee",
-          detail: `${request.requester} recherche ${request.title} à ${request.location}.`,
-          amount: total,
-          status: "done",
-        });
-      }
-      return;
-    }
-    if (isBoost) {
-      pushPlatformEvent({
-        type: "boost_payment",
-        title: "Boost annonce payé",
-        detail: `${savedProfile.firstName} ${savedProfile.lastName} a payé le boost pour ${ad.title}.`,
-        amount: total,
-        status: "pending",
-      });
-      return;
-    }
-    if (isDirectNumber) {
-      pushPlatformEvent({
-        type: "direct_number_payment",
-        title: "Option numéro direct payée",
-        detail: `${savedProfile.firstName} ${savedProfile.lastName} a payé l'option numéro direct pour ${ad.title}.`,
-        amount: total,
-        status: "done",
-      });
-      return;
-    }
-    pushPlatformEvent({
-      type: isSubscription ? "subscription_payment" : "booking_payment",
-      title: isSubscription ? `Paiement abonnement ${plan}` : "Réservation de bien confirmée",
-      detail: isSubscription
-        ? `${savedProfile.firstName} ${savedProfile.lastName} a paye ${plan}. Activation admin requise.`
-        : `${savedProfile.firstName} ${savedProfile.lastName} a paye pour reserver ${ad.title}.`,
-      amount: total,
-      status: isSubscription ? "pending" : "done",
-    });
+  const [phase, setPhase] = useState<Phase>("idle");
+  const [error, setError] = useState<string | null>(null);
+
+  // --- Flux abonnement ---
+  const [plans, setPlans] = useState<SubscriptionPlanInfo[]>([]);
+  const [selectedPlan, setSelectedPlan] = useState<SubscriptionPlan>("MONTHLY");
+  const [currentSub, setCurrentSub] = useState<Subscription | null>(null);
+
+  // --- Flux demande "Je recherche" (paramètres posés par la page de demande) ---
+  const demandPaymentId = searchParams.get("paymentId");
+  const demandAmount = Number(searchParams.get("amount") ?? 0);
+  const demandRef = searchParams.get("ref") ?? "";
+
+  useEffect(() => {
+    if (!isSubscription) return;
+    api
+      .get<{ plans: SubscriptionPlanInfo[] }>("/subscriptions/plans", undefined, false)
+      .then((res) => setPlans(res.data.plans))
+      .catch(() => setError("Impossible de charger les formules d'abonnement."));
+  }, [isSubscription]);
+
+  useEffect(() => {
+    if (!isSubscription || !user) return;
+    api
+      .get<{ subscription: Subscription | null }>("/subscriptions/me")
+      .then((res) => setCurrentSub(res.data.subscription))
+      .catch(() => setCurrentSub(null));
+  }, [isSubscription, user]);
+
+  const startPolling = async (paymentId: string) => {
+    setPhase("polling");
+    const { status } = await pollPaymentStatus(paymentId);
+    if (status === "SUCCESS") setPhase("success");
+    else if (status === "FAILED") setPhase("failed");
+    else setPhase("pending");
   };
+
+  const launchWidget = async (payment: { id: string; amount: number | string; providerRef?: string | null }) => {
+    setPhase("widget");
+    try {
+      await openKkiapay({
+        amount: Number(payment.amount),
+        providerRef: payment.providerRef ?? "",
+        onSuccess: () => startPolling(payment.id),
+        onFailed: () => setPhase("failed"),
+      });
+    } catch {
+      setPhase("idle");
+      setError("Impossible d'ouvrir le widget de paiement KKiaPay. Vérifiez votre connexion et réessayez.");
+    }
+  };
+
+  const paySubscription = async () => {
+    setError(null);
+    setPhase("initiating");
+    try {
+      const res = await api.post<{ payment: Payment; plan: SubscriptionPlanInfo }>("/subscriptions/subscribe", {
+        plan: selectedPlan,
+        method: "MOBILE_MONEY",
+      });
+      await launchWidget(res.data.payment);
+    } catch (err) {
+      setPhase("idle");
+      if (err instanceof ApiError && err.code === "SUBSCRIPTION_ALREADY_ACTIVE") {
+        setError("Vous avez déjà un abonnement Premium actif.");
+      } else if (err instanceof ApiError) {
+        setError(err.message);
+      } else {
+        setError("Une erreur est survenue. Réessayez.");
+      }
+    }
+  };
+
+  const payDemand = async () => {
+    if (!demandPaymentId) return;
+    setError(null);
+    await launchWidget({ id: demandPaymentId, amount: demandAmount, providerRef: demandRef });
+  };
+
+  const busy = phase === "initiating" || phase === "widget" || phase === "polling";
+  const finished = phase === "success" || phase === "pending";
+
+  // --- Services sans backend : boost, direct_number, réservation par défaut ---
+  if (!isSubscription && !isSearchDemand) {
+    return (
+      <main className={styles.page}>
+        <div className={styles.shell}>
+          <div className={styles.left}>
+            <Link href="/vendeur" className={styles.back} aria-label="Retour à mon espace">
+              <span aria-hidden>←</span>
+              Retour à mon espace
+            </Link>
+            <h1 className={styles.title}>Ce service n&apos;est pas encore disponible</h1>
+            <p className={styles.subtitle}>
+              {paymentType === "boost"
+                ? "Le boost par annonce n'existe pas encore. Pour mettre vos annonces en avant, souscrivez un abonnement Premium."
+                : paymentType === "direct_number"
+                ? "L'option « numéro direct » payante n'existe plus : l'affichage de votre numéro direct est inclus avec l'abonnement Premium."
+                : "La réservation en ligne n'est pas encore disponible. La consultation des contacts vendeurs est gratuite depuis la page d'une annonce."}
+            </p>
+            <div className={styles.section}>
+              <Link href="/paiement?type=abonnement" className={styles.submitBtn} style={{ display: "inline-block", textAlign: "center", textDecoration: "none" }}>
+                Découvrir l&apos;abonnement Premium
+              </Link>
+            </div>
+            <div className={styles.secureNote}>
+              <span className={styles.secureDot} />
+              Paiements sécurisés par KKiaPay. Seuls l&apos;abonnement Premium et les demandes « Je recherche » sont payants pour le moment.
+            </div>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  const backHref = "/vendeur";
+  const selectedPlanInfo = plans.find((p) => p.plan === selectedPlan);
+  const total = isSubscription ? selectedPlanInfo?.price ?? 0 : demandAmount;
 
   return (
     <main className={styles.page}>
       <div className={styles.shell}>
 
         <div className={styles.left}>
-          <Link href={backHref} className={styles.back} aria-label={backLabel}>
+          <Link href={isSubscription ? "/vendeur" : "/vendeur/recherches/nouvelle"} className={styles.back} aria-label="Retour">
             <span aria-hidden>←</span>
-            {backLabel}
+            {isSubscription ? "Retour à mon espace" : "Retour au formulaire"}
           </Link>
-          <h1 className={styles.title}>{isSubscription ? "Payer un abonnement" : isBoost ? "Booster cette annonce" : isSearchUrgency ? "Payer l'urgence" : isDirectNumber ? "Dévoiler son numéro (Vendeur)" : "Réserver ce bien"}</h1>
+          <h1 className={styles.title}>{isSubscription ? "Souscrire un abonnement Premium" : "Payer ma demande « Je recherche »"}</h1>
           <p className={styles.subtitle}>
-            {isBoost
-              ? "Le boost est attaché à cette annonce précise. Après paiement, l'admin reçoit la demande et active la mise en avant."
-              : isSearchUrgency
-              ? "Le paiement Express publie votre demande Je recherche en priorité auprès des vendeurs concernés."
-              : isSubscription
-              ? "Après paiement, l'admin reçoit une notification et active votre offre premium."
-              : isDirectNumber
-              ? "En tant que vendeur, payez cette option pour dévoiler directement votre numéro de téléphone sur l'annonce au lieu du numéro d'OKKAZ."
-              : "Vos informations de profil sont déjà enregistrées. Après paiement de la réservation, le vendeur sera averti."}
+            {isSubscription
+              ? "L'abonnement Premium met vos annonces en avant et affiche votre numéro direct aux acheteurs. Paiement via KKiaPay (Mobile Money ou carte)."
+              : "Votre demande a été créée. Réglez-la via KKiaPay pour qu'elle soit publiée auprès des vendeurs."}
           </p>
 
-          <form className={styles.form} onSubmit={(e) => { e.preventDefault(); confirmPayment(); }}>
+          {!authLoading && !user && (
+            <p style={{ background: "#fef3c7", color: "#b45309", padding: "12px 16px", borderRadius: 12, fontWeight: 700 }}>
+              Connectez-vous pour effectuer un paiement. <Link href="/connexion" style={{ textDecoration: "underline" }}>Se connecter</Link>
+            </p>
+          )}
 
-            <div className={styles.section}>
-              <p className={styles.sectionLabel}>Profil utilisé</p>
-              <div className={styles.profileCard}>
-                <div>
-                  <span>Nom et prénoms</span>
-                  <strong>{savedProfile.firstName} {savedProfile.lastName}</strong>
-                </div>
-                <div>
-                  <span>Numéro du compte</span>
-                  <strong>{savedProfile.phone}</strong>
-                </div>
-                <div>
-                  <span>Moyen enregistré</span>
-                  <strong>{savedProfile.card}</strong>
-                </div>
-              </div>
-            </div>
+          <div className={styles.form}>
+            {isSubscription && (
+              <>
+                {currentSub && currentSub.status === "ACTIVE" && (
+                  <p style={{ background: "#dcfce7", color: "#15803d", padding: "12px 16px", borderRadius: 12, fontWeight: 700 }}>
+                    Vous avez déjà un abonnement {currentSub.plan === "WEEKLY" ? "hebdomadaire" : "mensuel"} actif
+                    jusqu&apos;au {new Date(currentSub.endsAt).toLocaleDateString("fr-FR")}.
+                  </p>
+                )}
 
-            {!isSubscription && !isBoost && !isSearchUrgency && !isDirectNumber && (
-            <div className={styles.section}>
-              <p className={styles.sectionLabel}>Durée de location</p>
-              <div className={styles.durationBtns}>
-                <button type="button" className={styles.durationActive}>{ad.minimumDuration}</button>
-                <button type="button" className={styles.duration}>3 mois</button>
-                <button type="button" className={styles.duration}>6 mois</button>
-                <button type="button" className={styles.duration}>Sur mesure</button>
-              </div>
-            </div>
+                <div className={styles.section}>
+                  <p className={styles.sectionLabel}>Choisissez votre formule</p>
+                  <div className={styles.durationBtns}>
+                    {plans.length === 0 && <span>Chargement des formules...</span>}
+                    {plans.map((p) => (
+                      <button
+                        key={p.plan}
+                        type="button"
+                        onClick={() => setSelectedPlan(p.plan)}
+                        className={selectedPlan === p.plan ? styles.durationActive : styles.duration}
+                        disabled={busy || finished}
+                      >
+                        {PLAN_LABELS[p.plan]} · {fcfa(p.price)} / {p.durationDays} jours
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
+
+            {isSearchDemand && !demandPaymentId && (
+              <p style={{ background: "#fee2e2", color: "#b91c1c", padding: "12px 16px", borderRadius: 12, fontWeight: 700 }}>
+                Référence de paiement introuvable. Repassez par le formulaire{" "}
+                <Link href="/vendeur/recherches/nouvelle" style={{ textDecoration: "underline" }}>Je recherche</Link>.
+              </p>
             )}
 
             <div className={styles.section}>
               <p className={styles.sectionLabel}>Mode de paiement</p>
-              <div className={styles.paymentMethods}>
-                <label className={styles.paymentOption}>
-                  <input type="radio" name="payment" defaultChecked />
-                  <span>Mobile Money</span>
-                </label>
-                <label className={styles.paymentOption}>
-                  <input type="radio" name="payment" />
-                  <span>Carte bancaire enregistrée</span>
-                </label>
-                <label className={styles.paymentOption}>
-                  <input type="radio" name="payment" />
-                  <span>Virement bancaire</span>
-                </label>
-              </div>
+              <p style={{ color: "var(--muted, #6b7280)", fontSize: "0.85rem", fontWeight: 600 }}>
+                Mobile Money ou carte bancaire — le choix se fait directement dans la fenêtre sécurisée KKiaPay.
+              </p>
             </div>
 
-            <button type="submit" className={styles.submitBtn}>
-              {isPaid ? "Paiement confirmé" : isSubscription ? "Payer l'abonnement" : isBoost ? "Payer le boost" : isSearchUrgency ? "Payer et publier en Express" : isDirectNumber ? "Payer et dévoiler son numéro" : "Réserver ce bien"}
-            </button>
-
-            {isPaid && !isSubscription && !isBoost && !isSearchUrgency && !isDirectNumber && (
-              <div className={styles.revealBox}>
-                <span>Réservation confirmée !</span>
-                <strong>{ad.directNumber ? ad.ownerPhone : "+229 01 00 00 00 00"}</strong>
-                <p>Votre paiement a été validé. Vous pouvez contacter le vendeur ou notre équipe intermédiaire.</p>
-                <Link href="/chat" className={styles.chatLink}>Ouvrir le chat OKKAZ</Link>
-              </div>
+            {error && (
+              <p style={{ background: "#fee2e2", color: "#b91c1c", padding: "12px 16px", borderRadius: 12, fontWeight: 700 }}>
+                {error}
+              </p>
             )}
 
-            {isPaid && isBoost && (
-              <div className={styles.revealBox}>
-                <span>Boost payé</span>
-                <strong>{ad.title}</strong>
-                <p>OKKAZ a reçu la demande. L&apos;annonce sera mise en avant après validation admin.</p>
-                <Link href="/vendeur" className={styles.chatLink}>Retour à mes annonces</Link>
-              </div>
+            {!finished && (
+              <button
+                type="button"
+                className={styles.submitBtn}
+                onClick={isSubscription ? paySubscription : payDemand}
+                disabled={
+                  busy ||
+                  !user ||
+                  (isSubscription && (!selectedPlanInfo || (currentSub?.status === "ACTIVE"))) ||
+                  (isSearchDemand && !demandPaymentId)
+                }
+              >
+                {phase === "initiating"
+                  ? "Initialisation du paiement..."
+                  : phase === "widget"
+                  ? "Fenêtre KKiaPay ouverte..."
+                  : phase === "polling"
+                  ? "Vérification du paiement..."
+                  : `Payer ${total ? fcfa(total) : ""} avec KKiaPay`}
+              </button>
             )}
 
-            {isPaid && isDirectNumber && (
-              <div className={styles.revealBox}>
-                <span>Option activée !</span>
-                <strong>Numéro direct visible</strong>
-                <p>Votre numéro direct est maintenant visible de tous sur la page de l&apos;annonce.</p>
-                <Link href="/vendeur" className={styles.chatLink}>Retour à mon espace</Link>
-              </div>
-            )}
+            <PaymentStatusBox phase={phase} backHref={backHref} />
 
-            {isPaid && isSearchUrgency && (
-              <div className={styles.revealBox}>
-                <span>Demande Express publiée</span>
-                <strong>Les vendeurs sont notifiés</strong>
-                <p>Votre demande apparaît dans Annonces &gt; Je recherche et dans le back-office admin.</p>
-                <Link href="/annonces?category=Je recherche" className={styles.chatLink}>Voir ma demande</Link>
-              </div>
+            {phase === "failed" && (
+              <button type="button" className={styles.submitBtn} onClick={isSubscription ? paySubscription : payDemand} disabled={!user}>
+                Réessayer le paiement
+              </button>
             )}
-
-            {isPaid && isSubscription && (
-              <div className={styles.revealBox}>
-                <span>Abonnement payé</span>
-                <strong>Activation en attente admin</strong>
-                <p>OKKAZ a reçu la notification de paiement. Votre abonnement sera accordé depuis le back-office.</p>
-                <Link href="/vendeur" className={styles.chatLink}>Retour à mon espace</Link>
-              </div>
-            )}
-
-          </form>
+          </div>
         </div>
 
         <div className={styles.right}>
           <div className={styles.summary}>
             <p className={styles.summaryLabel}>Récapitulatif</p>
-            {!isSubscription && !isSearchUrgency && (
-              <div className={styles.summaryImg}>
-                <Image src={ad.image} alt={ad.title} fill sizes="380px" />
-              </div>
-            )}
-            <p className={styles.summaryTitle}>{isSubscription ? "Abonnement compte" : isBoost ? `Boost · ${ad.title}` : isSearchUrgency ? "Publication Je recherche Express" : isDirectNumber ? `Dévoiler son numéro · ${ad.title}` : ad.title}</p>
-            <p className={styles.summaryOwner}>{isSubscription ? plan : isBoost || isDirectNumber ? `${ad.reference} · ${ad.location}` : isSearchUrgency ? "Alerte prioritaire vendeurs" : `${ad.owner} · ${ad.location}`}</p>
+            <p className={styles.summaryTitle}>
+              {isSubscription ? PLAN_LABELS[selectedPlan] : "Publication demande « Je recherche »"}
+            </p>
+            <p className={styles.summaryOwner}>
+              {isSubscription
+                ? "Abonnement compte vendeur"
+                : demandRef
+                ? `Référence : ${demandRef}`
+                : "Alerte prioritaire vendeurs"}
+            </p>
 
             <div className={styles.summaryLines}>
-              {!isSubscription && !isBoost && !isSearchUrgency && !isDirectNumber && <div className={styles.summaryLine}>
-                <span>Loyer</span>
-                <strong>{ad.price.toLocaleString("fr-FR")} FCFA</strong>
-              </div>}
-              {!isSubscription && !isBoost && !isSearchUrgency && !isDirectNumber && <div className={styles.summaryLine}>
-                <span>Caution</span>
-                <strong>{ad.deposit.toLocaleString("fr-FR")} FCFA</strong>
-              </div>}
               <div className={styles.summaryLine}>
-                <span>{isSubscription ? "Plan" : isBoost ? "Service" : isSearchUrgency ? "Service" : isDirectNumber ? "Option" : "Durée"}</span>
-                <strong>{isSubscription ? plan : isBoost ? "Boost annonce 7 jours" : isSearchUrgency ? "Je recherche Express" : isDirectNumber ? "Dévoilement numéro vendeur" : ad.minimumDuration}</strong>
+                <span>Service</span>
+                <strong>
+                  {isSubscription
+                    ? selectedPlanInfo
+                      ? `${selectedPlanInfo.durationDays} jours de visibilité Premium`
+                      : "—"
+                    : "Diffusion de la demande"}
+                </strong>
+              </div>
+              <div className={styles.summaryLine}>
+                <span>Paiement</span>
+                <strong>KKiaPay (MoMo / carte)</strong>
               </div>
             </div>
 
             <div className={styles.summaryTotal}>
               <span>Total à régler</span>
-              <strong>{total.toLocaleString("fr-FR")} FCFA</strong>
+              <strong>{fcfa(total)}</strong>
             </div>
 
             <div className={styles.secureNote}>
               <span className={styles.secureDot} />
-              {secureCopy}
+              Paiement sécurisé par KKiaPay. La confirmation finale est transmise par webhook au serveur OKKAZ.
             </div>
           </div>
         </div>

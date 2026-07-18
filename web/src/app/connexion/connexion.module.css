@@ -105,6 +105,111 @@
   border: 1px solid #111111;
 }
 
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  flex: 1;
+}
+
+.fieldRow {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.label {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: rgba(17, 17, 17, 0.75);
+}
+
+.input {
+  width: 100%;
+  min-height: 48px;
+  padding: 0 1rem;
+  border-radius: 14px;
+  border: 1px solid rgba(17, 17, 17, 0.15);
+  font-size: 0.95rem;
+  color: #111111;
+  background: #ffffff;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.input:focus {
+  border-color: #111111;
+}
+
+.error {
+  margin: 0;
+  padding: 0.7rem 1rem;
+  border-radius: 12px;
+  background: rgba(220, 38, 38, 0.08);
+  border: 1px solid rgba(220, 38, 38, 0.25);
+  color: #b91c1c;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.success {
+  margin: 0;
+  padding: 0.8rem 1rem;
+  border-radius: 12px;
+  background: rgba(22, 163, 74, 0.09);
+  border: 1px solid rgba(22, 163, 74, 0.24);
+  color: #15803d;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  text-align: center;
+}
+
+.roleChoice {
+  display: flex;
+  gap: 0.6rem;
+}
+
+.roleBtn,
+.roleActive {
+  flex: 1;
+  min-height: 44px;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border: 1px solid rgba(17, 17, 17, 0.15);
+  background: #ffffff;
+  color: rgba(17, 17, 17, 0.7);
+}
+
+.roleActive {
+  border-color: #111111;
+  background: rgba(17, 17, 17, 0.05);
+  color: #111111;
+}
+
+.switchMode {
+  border: none;
+  background: none;
+  color: rgba(17, 17, 17, 0.65);
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 0.25rem;
+}
+
+.btnApple:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 @media (min-width: 481px) {
   .hero {
     display: none;
@@ -117,17 +222,56 @@
 
 @media (min-width: 900px) {
   .card {
-    width: min(100%, 440px);
-    padding: 2.75rem 2.5rem;
+    width: min(100%, 580px);
+    padding: 1.5rem 2.75rem 1.75rem;
     border-radius: 28px;
+    gap: 1rem;
+  }
+
+  .cardPicture {
+    width: min(100%, 190px);
+    margin: -0.75rem auto -0.5rem;
+  }
+
+  .form {
+    gap: 0.7rem;
+  }
+
+  .input {
+    min-height: 44px;
+  }
+
+  .btnGoogle,
+  .btnApple {
+    min-height: 48px;
   }
 
   .title {
-    font-size: 2.35rem;
+    font-size: 2.2rem;
   }
 
   .subtitle {
-    font-size: 1.05rem;
+    margin-top: 0.45rem;
+    font-size: 1rem;
+    line-height: 1.45;
+  }
+
+  .registerCard {
+    width: min(100%, 720px);
+    padding-block: 1.25rem 1.5rem;
+  }
+
+  .registerForm {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.65rem 1rem;
+  }
+
+  .registerForm > .fieldRow,
+  .registerForm > .field:last-of-type,
+  .registerForm > .roleChoice,
+  .registerForm > .btnApple {
+    grid-column: 1 / -1;
   }
 }
 
@@ -140,23 +284,26 @@
 
   .hero {
     display: flex;
-    max-height: 58vh;
+    max-height: 42vh;
     overflow: hidden;
   }
 
   .heroPicture {
-    transform: translate(-0.35rem, 2.5rem) scale(1.1);
+    width: 96%;
+    margin-inline: auto;
+    transform: translateY(2.25rem) scale(1);
     transform-origin: top center;
     display: block;
   }
 
   .card {
     width: 100%;
-    margin-top: 8rem;
+    margin-top: 1.25rem;
     background: transparent;
     box-shadow: none;
-    padding: 1.25rem 1rem 1.75rem;
+    padding: 0.75rem 1rem 1.75rem;
     border-radius: 0;
+    gap: 1.15rem;
   }
 
   .cardPicture {
@@ -168,14 +315,14 @@
   }
 
   .title {
-    font-size: 2rem;
+    font-size: 1.85rem;
     letter-spacing: 0;
   }
 
   .subtitle {
-    margin-top: 0.55rem;
-    font-size: 0.95rem;
-    line-height: 1.45;
+    margin-top: 0.45rem;
+    font-size: 0.9rem;
+    line-height: 1.4;
   }
 
   .buttons {
@@ -183,11 +330,44 @@
   }
 
   .label {
-    font-size: 0.98rem;
+    font-size: 0.9rem;
+  }
+
+  .form {
+    gap: 0.75rem;
+  }
+
+  .input {
+    min-height: 46px;
   }
 
   .btnGoogle,
   .btnApple {
-    min-height: 52px;
+    min-height: 48px;
+  }
+
+  .roleChoice > button {
+    font-size: 0.78rem;
+  }
+
+  .forgotCard {
+    width: 100%;
+    margin: 1.25rem 0 0;
+    padding: 0.75rem 1rem 1.75rem;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .forgotCard .title {
+    font-size: 1.7rem;
+    line-height: 1.15;
+  }
+
+  .forgotCard .subtitle {
+    max-width: 19rem;
+    margin: 0.5rem auto 0;
+    font-size: 0.9rem;
+    line-height: 1.5;
   }
 }

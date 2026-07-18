@@ -1,14 +1,56 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { api, ApiError } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
+import type { ApiUser } from "@/lib/types";
 import AdminShell from "../AdminShell";
 import styles from "../admin.module.css";
 
+const inputStyle: React.CSSProperties = {
+  minHeight: 44,
+  border: "1px solid var(--line)",
+  borderRadius: 12,
+  padding: "0 14px",
+  font: "inherit",
+};
+
 export default function AdminProfilePage() {
-  const [name, setName] = useState("Admin OKKAZ");
-  const [email, setEmail] = useState("admin@okkaz.bj");
+  const router = useRouter();
+  const { logout, refreshUser } = useAuth();
+
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [email, setEmail] = useState("");
+  const [city, setCity] = useState("");
+  const [address, setAddress] = useState("");
   const [photo, setPhoto] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+
+  const [feedback, setFeedback] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [changingPassword, setChangingPassword] = useState(false);
+
+  useEffect(() => {
+    api
+      .get<{ user: ApiUser }>("/users/me")
+      .then((res) => {
+        const user = res.data.user;
+        setFirstName(user.firstName ?? "");
+        setLastName(user.lastName ?? "");
+        setEmail(user.email ?? "");
+        setCity(user.city ?? "");
+        setAddress(user.address ?? "");
+        if (user.profilePhotoUrl) setPhoto(user.profilePhotoUrl);
+      })
+      .catch((err) => {
+        setFeedback(err instanceof ApiError ? err.message : "Impossible de charger le profil.");
+      });
+  }, []);
 
   const handlePhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -23,8 +65,56 @@ export default function AdminProfilePage() {
     if (fileRef.current) fileRef.current.value = "";
   };
 
-  const initials = name
+  const saveProfile = async () => {
+    if (!firstName.trim() || !lastName.trim()) {
+      setFeedback("Le prénom et le nom sont obligatoires.");
+      return;
+    }
+    setSaving(true);
+    setFeedback(null);
+    try {
+      await api.patch("/users/me", {
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        city: city.trim() || undefined,
+        address: address.trim() || undefined,
+      });
+      await refreshUser();
+      setFeedback("Profil mis à jour.");
+    } catch (err) {
+      setFeedback(err instanceof ApiError ? err.message : "Erreur lors de la mise à jour.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const changePassword = async () => {
+    if (!currentPassword || !newPassword) {
+      setFeedback("Renseignez le mot de passe actuel et le nouveau mot de passe.");
+      return;
+    }
+    if (
+      !confirm(
+        "Changer le mot de passe déconnectera toutes vos sessions. Vous devrez vous reconnecter. Continuer ?",
+      )
+    ) {
+      return;
+    }
+    setChangingPassword(true);
+    setFeedback(null);
+    try {
+      await api.patch("/users/me/password", { currentPassword, newPassword });
+      await logout();
+      router.push("/connexion");
+    } catch (err) {
+      setFeedback(err instanceof ApiError ? err.message : "Erreur lors du changement de mot de passe.");
+      setChangingPassword(false);
+    }
+  };
+
+  const initials = `${firstName} ${lastName}`
     .split(" ")
+    .filter(Boolean)
     .map((n) => n[0])
     .join("")
     .toUpperCase()
@@ -36,21 +126,22 @@ export default function AdminProfilePage() {
         <header className={styles.header}>
           <div>
             <h1>Profil administrateur</h1>
-            <p>Identite, photo, role, securite du compte et historique de connexion.</p>
+            <p>Identite, photo et securite du compte.</p>
           </div>
-          <label className={styles.search}>
-            <span>Search</span>
-            <input type="search" placeholder="Activite, action" />
-          </label>
           <div className={styles.avatar}>{initials || "OK"}</div>
         </header>
+
+        {feedback ? <p className={styles.adminModerationEmpty}>{feedback}</p> : null}
 
         <section className={styles.grid} style={{ gridTemplateColumns: "minmax(0, 1.4fr) minmax(0, 1fr)" }}>
           <article className={styles.card}>
             <div className={styles.cardHeader}>
               <div>
                 <h2>Photo de profil</h2>
-                <p>JPG, PNG ou WebP - 5 Mo max. Visible dans la sidebar et l&apos;en-tete.</p>
+                <p>
+                  Aperçu local uniquement — l&apos;upload de photo de profil n&apos;est pas
+                  encore disponible côté backend.
+                </p>
               </div>
             </div>
 
@@ -145,34 +236,63 @@ export default function AdminProfilePage() {
             <div className={styles.cardHeader}>
               <div>
                 <h2>Securite</h2>
-                <p>Sessions actives et derniere connexion.</p>
+                <p>Changement de mot de passe.</p>
               </div>
             </div>
-            <div className={styles.scheduleList}>
-              <div className={styles.scheduleItem}>
-                <span>iOS</span>
-                <div>
-                  <strong>iPhone Safari</strong>
-                  <p>Cotonou - 23/05/2026 14:22</p>
-                </div>
-                <em>Active</em>
-              </div>
-              <div className={styles.scheduleItem}>
-                <span>Mac</span>
-                <div>
-                  <strong>Chrome 132</strong>
-                  <p>Cotonou - 23/05/2026 09:18</p>
-                </div>
-                <em>Cette session</em>
-              </div>
-              <div className={styles.scheduleItem}>
-                <span>Win</span>
-                <div>
-                  <strong>Edge</strong>
-                  <p>Cotonou - 22/05/2026 19:55</p>
-                </div>
-                <em>Revoquer</em>
-              </div>
+            <p
+              style={{
+                marginBottom: 12,
+                padding: "10px 14px",
+                borderRadius: 12,
+                background: "rgba(234, 179, 8, 0.12)",
+                color: "#92400e",
+                fontWeight: 700,
+                fontSize: "0.8rem",
+              }}
+            >
+              La liste des sessions actives n&apos;est pas disponible (endpoint manquant côté
+              backend). Le changement de mot de passe révoque toutes les sessions.
+            </p>
+            <div style={{ display: "grid", gap: 12 }}>
+              <label style={{ display: "grid", gap: 6, fontSize: "0.78rem", fontWeight: 800 }}>
+                Mot de passe actuel
+                <input
+                  type="password"
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  autoComplete="current-password"
+                  style={inputStyle}
+                />
+              </label>
+              <label style={{ display: "grid", gap: 6, fontSize: "0.78rem", fontWeight: 800 }}>
+                Nouveau mot de passe
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  autoComplete="new-password"
+                  style={inputStyle}
+                />
+              </label>
+              <button
+                type="button"
+                disabled={changingPassword}
+                onClick={() => void changePassword()}
+                style={{
+                  justifySelf: "start",
+                  minHeight: 44,
+                  padding: "0 22px",
+                  border: 0,
+                  borderRadius: 999,
+                  background: "#dc2626",
+                  color: "#fff",
+                  font: "inherit",
+                  fontWeight: 800,
+                  cursor: "pointer",
+                }}
+              >
+                {changingPassword ? "Changement..." : "Changer le mot de passe"}
+              </button>
             </div>
           </article>
         </section>
@@ -181,39 +301,35 @@ export default function AdminProfilePage() {
           <div className={styles.cardHeader}>
             <div>
               <h2>Informations</h2>
-              <p>Mettez a jour vos informations de connexion.</p>
+              <p>Mettez a jour vos informations de profil.</p>
             </div>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 16 }}>
             <label style={{ display: "grid", gap: 6, fontSize: "0.78rem", fontWeight: 800 }}>
-              Nom complet
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                style={{ minHeight: 44, border: "1px solid var(--line)", borderRadius: 12, padding: "0 14px", font: "inherit" }}
-              />
+              Prénom
+              <input type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} style={inputStyle} />
             </label>
             <label style={{ display: "grid", gap: 6, fontSize: "0.78rem", fontWeight: 800 }}>
-              Email
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                style={{ minHeight: 44, border: "1px solid var(--line)", borderRadius: 12, padding: "0 14px", font: "inherit" }}
-              />
+              Nom
+              <input type="text" value={lastName} onChange={(e) => setLastName(e.target.value)} style={inputStyle} />
             </label>
             <label style={{ display: "grid", gap: 6, fontSize: "0.78rem", fontWeight: 800 }}>
-              Mot de passe
-              <input
-                type="password"
-                defaultValue="********"
-                style={{ minHeight: 44, border: "1px solid var(--line)", borderRadius: 12, padding: "0 14px", font: "inherit" }}
-              />
+              Email (non modifiable)
+              <input type="email" value={email} readOnly disabled style={inputStyle} />
+            </label>
+            <label style={{ display: "grid", gap: 6, fontSize: "0.78rem", fontWeight: 800 }}>
+              Ville
+              <input type="text" value={city} onChange={(e) => setCity(e.target.value)} style={inputStyle} />
+            </label>
+            <label style={{ display: "grid", gap: 6, fontSize: "0.78rem", fontWeight: 800 }}>
+              Adresse
+              <input type="text" value={address} onChange={(e) => setAddress(e.target.value)} style={inputStyle} />
             </label>
           </div>
           <button
             type="button"
+            disabled={saving}
+            onClick={() => void saveProfile()}
             style={{
               marginTop: 16,
               justifySelf: "flex-start",
@@ -228,7 +344,7 @@ export default function AdminProfilePage() {
               cursor: "pointer",
             }}
           >
-            Enregistrer les modifications
+            {saving ? "Enregistrement..." : "Enregistrer les modifications"}
           </button>
         </article>
       </section>
