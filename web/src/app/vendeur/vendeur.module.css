@@ -4787,22 +4787,8 @@
   padding: 34px 38px;
   border: 1px solid rgba(59, 130, 246, 0.12);
   border-radius: 30px;
-  background:
-    radial-gradient(circle at 92% 10%, rgba(59, 130, 246, 0.18), transparent 34%),
-    linear-gradient(135deg, #ffffff 0%, #f7fbff 100%);
+  background: #ffffff;
   box-shadow: 0 18px 45px rgba(23, 22, 36, 0.07);
-}
-
-.demandsHeader::after {
-  content: "";
-  position: absolute;
-  right: -62px;
-  bottom: -94px;
-  width: 230px;
-  height: 230px;
-  border: 42px solid rgba(59, 130, 246, 0.07);
-  border-radius: 50%;
-  pointer-events: none;
 }
 
 .demandsHeaderIcon {
