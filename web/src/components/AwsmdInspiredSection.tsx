@@ -177,7 +177,7 @@ export default function AwsmdInspiredSection() {
               <span className={styles.staticTitleText}>Des biens vérifiés</span>
               <span className={styles.movingTitleLine}>
                 <span className={styles.movingTitleText} ref={titleMovingRef}>
-                  prêts à réserver
+                  prêts à louer ou acheter
                 </span>
               </span>
             </h2>

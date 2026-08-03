@@ -75,7 +75,7 @@ export default function ContactPage() {
                 <option value="" disabled>
                   Choisir un sujet
                 </option>
-                <option>Réserver un bien</option>
+                <option>Contacter pour un bien</option>
                 <option>Publier une annonce</option>
                 <option>Devenir partenaire</option>
                 <option>Support</option>

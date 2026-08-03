@@ -29,7 +29,7 @@ router.patch(
 
 router.get('/me/listings', authenticate, authorize('SELLER', 'SELLER_PRO'), asyncHandler(controller.getMyListings));
 // Un vendeur peut aussi consulter des contacts : historique ouvert à tous les rôles consommateurs.
-router.get('/me/contact-reveals', authenticate, authorize('BUYER', 'SELLER', 'SELLER_PRO'), asyncHandler(controller.getMyContactReveals));
+router.get('/me/contact-reveals', authenticate, authorize('BUYER', 'SELLER', 'SELLER_PRO', 'ADMIN'), asyncHandler(controller.getMyContactReveals));
 router.get('/me/payments', authenticate, asyncHandler(controller.getMyPayments));
 
 router.get(

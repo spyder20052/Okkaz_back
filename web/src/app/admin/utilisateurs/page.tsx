@@ -26,7 +26,7 @@ type UserDetail = ApiUser & {
 };
 
 const ROLE_LABELS: Record<UserRole, string> = {
-  BUYER: "Acheteur",
+  BUYER: "Membre",
   SELLER: "Vendeur",
   SELLER_PRO: "Vendeur Pro",
   ADMIN: "Admin",
@@ -180,7 +180,7 @@ export default function AdminUtilisateursPage() {
           </Link>
           <header className={styles.spaceHeader}>
             <h1>Utilisateurs</h1>
-            <p>Gestion des comptes : acheteurs, vendeurs, vendeurs pro et admins.</p>
+            <p>Gestion des comptes : membres, vendeurs, vendeurs pro et admins.</p>
           </header>
         </div>
 

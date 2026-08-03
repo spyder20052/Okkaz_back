@@ -25,7 +25,7 @@ export default function SellerDemandsPage() {
   }, [page, type]);
   useEffect(() => { const timer = setTimeout(() => void load(), 0); return () => clearTimeout(timer); }, [load]);
   return <SellerShell active="/vendeur/recherches"><section className={common.page}><div className={common.shell}>
-    <header className={common.header}><div><h1>Demandes des acheteurs</h1><p>Consultez les biens recherchés et proposez une annonce adaptée.</p></div><Link className={common.secondary} href="/vendeur">Dashboard</Link></header>
+    <header className={common.header}><div><h1>Demandes de biens</h1><p>Consultez les besoins publiés et proposez une annonce adaptée.</p></div><Link className={common.secondary} href="/vendeur">Dashboard</Link></header>
     <div className={common.row}>
       {(["", "STANDARD", "EXPRESS"] as const).map((value) => <button key={value || "ALL"} className={type === value ? common.button : common.secondary} onClick={() => { setType(value); setPage(1); }}>{value === "" ? "Toutes" : value === "STANDARD" ? "Standard" : "Express Pro"}</button>)}
     </div>

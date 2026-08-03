@@ -288,7 +288,7 @@ function PublishForm() {
   }
 
   return (
-    <section className={styles.spaceContent}>
+    <section className={`${styles.spaceContent} ${styles.publishFlowContent}`}>
       <div className={styles.publishTop}>
         <Link href="/vendeur" className={styles.publishBack} aria-label="Annuler et retourner au profil">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
@@ -625,21 +625,6 @@ function PublishForm() {
         </article>
         </div>
 
-        <aside className={styles.requestColSide} aria-hidden>
-          <div className={styles.requestBubble}>
-            <strong>Astuce</strong>
-            <p>Mets de belles photos et un titre clair. Tes annonces sont validées en 72h max par notre équipe.</p>
-            <span className={styles.requestBubbleTail} aria-hidden />
-          </div>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/18.png?v=20260527-trim"
-            alt=""
-            width={6250}
-            height={6250}
-            className={styles.requestMascot}
-          />
-        </aside>
       </div>
     </section>
   );

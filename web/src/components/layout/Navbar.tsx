@@ -11,7 +11,7 @@ import styles from "./Navbar.module.css";
 function spaceForRole(user: ApiUser): string {
   if (user.role === "ADMIN") return "/admin";
   if (user.role === "SELLER" || user.role === "SELLER_PRO") return "/vendeur";
-  return "/annonces";
+  return "/demandes";
 }
 
 export default function Navbar() {
@@ -56,7 +56,11 @@ export default function Navbar() {
     };
   }, [isMenuOpen]);
 
-  if (pathname.startsWith("/admin") || pathname.startsWith("/vendeur")) {
+  if (
+    pathname.startsWith("/admin") ||
+    pathname.startsWith("/vendeur") ||
+    pathname.startsWith("/demandes")
+  ) {
     return null;
   }
 

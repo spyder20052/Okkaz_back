@@ -4,10 +4,10 @@
  *
  * | Méthode | Chemin         | Rôle(s)                    | Description                 |
  * |---------|----------------|----------------------------|-----------------------------|
- * | POST    | /initiate      | BUYER                      | Initie une demande + paiement |
+ * | POST    | /initiate      | Tout compte authentifié    | Initie une demande + paiement |
  * | GET     | /              | SELLER_PRO                 | Demandes pro (STD + EXPRESS)  |
  * | GET     | /standard      | SELLER, SELLER_PRO         | Demandes STANDARD publiques   |
- * | GET     | /me            | BUYER                      | Mes demandes                  |
+ * | GET     | /me            | Tout compte authentifié    | Mes demandes                  |
  * | GET     | /:id           | SELLER, SELLER_PRO, ADMIN  | Détail d'une demande          |
  * | PATCH   | /:id/close     | BUYER, ADMIN               | Clôturer une demande          |
  */
@@ -26,7 +26,7 @@ const router = Router();
 router.post(
   '/initiate',
   authenticate,
-  authorize('BUYER', 'SELLER', 'SELLER_PRO'),
+  authorize('BUYER', 'SELLER', 'SELLER_PRO', 'ADMIN'),
   validateRequest({ body: schemas.initiateDemandSchema }),
   asyncHandler(controller.initiate),
 );
@@ -34,7 +34,7 @@ router.post(
 router.get('/', authenticate, authorize('SELLER_PRO'), asyncHandler(controller.listPro));
 router.get('/standard', authenticate, authorize('SELLER', 'SELLER_PRO'), asyncHandler(controller.listStandard));
 
-router.get('/me', authenticate, authorize('BUYER', 'SELLER', 'SELLER_PRO'), asyncHandler(controller.mine));
+router.get('/me', authenticate, authorize('BUYER', 'SELLER', 'SELLER_PRO', 'ADMIN'), asyncHandler(controller.mine));
 router.get(
   '/:id',
   authenticate,

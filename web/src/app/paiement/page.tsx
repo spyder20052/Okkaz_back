@@ -155,6 +155,11 @@ function PaiementContent() {
 
   const busy = phase === "initiating" || phase === "widget" || phase === "polling";
   const finished = phase === "success" || phase === "pending";
+  const accountHref = user?.role === "ADMIN"
+    ? "/admin"
+    : user?.role === "SELLER" || user?.role === "SELLER_PRO"
+      ? "/vendeur"
+      : "/demandes";
 
   // --- Services sans backend : boost, direct_number, réservation par défaut ---
   if (!isSubscription && !isSearchDemand) {
@@ -162,7 +167,7 @@ function PaiementContent() {
       <main className={styles.page}>
         <div className={styles.shell}>
           <div className={styles.left}>
-            <Link href="/vendeur" className={styles.back} aria-label="Retour à mon espace">
+            <Link href={accountHref} className={styles.back} aria-label="Retour à mon espace">
               <span aria-hidden>←</span>
               Retour à mon espace
             </Link>
@@ -189,7 +194,7 @@ function PaiementContent() {
     );
   }
 
-  const backHref = "/vendeur";
+  const backHref = isSearchDemand ? "/demandes" : accountHref;
   const selectedPlanInfo = plans.find((p) => p.plan === selectedPlan);
   const total = isSubscription ? selectedPlanInfo?.price ?? 0 : demandAmount;
 
@@ -198,7 +203,7 @@ function PaiementContent() {
       <div className={styles.shell}>
 
         <div className={styles.left}>
-          <Link href={isSubscription ? "/vendeur" : "/vendeur/recherches/nouvelle"} className={styles.back} aria-label="Retour">
+          <Link href={isSubscription ? accountHref : "/demandes/nouvelle"} className={styles.back} aria-label="Retour">
             <span aria-hidden>←</span>
             {isSubscription ? "Retour à mon espace" : "Retour au formulaire"}
           </Link>
@@ -248,7 +253,7 @@ function PaiementContent() {
             {isSearchDemand && !demandPaymentId && (
               <p style={{ background: "#fee2e2", color: "#b91c1c", padding: "12px 16px", borderRadius: 12, fontWeight: 700 }}>
                 Référence de paiement introuvable. Repassez par le formulaire{" "}
-                <Link href="/vendeur/recherches/nouvelle" style={{ textDecoration: "underline" }}>Je recherche</Link>.
+                <Link href="/demandes/nouvelle" style={{ textDecoration: "underline" }}>Je recherche</Link>.
               </p>
             )}
 

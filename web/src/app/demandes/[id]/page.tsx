@@ -20,7 +20,7 @@ export default function DemandDetailPage({ params }: { params: Promise<{ id: str
   }, [id]);
 
   return <section className={common.page}><div className={common.shell}>
-    <header className={common.header}><div><h1>Détail de la demande</h1><p>Informations transmises par l’acheteur.</p></div><Link className={common.secondary} href="/vendeur/recherches">Retour aux demandes</Link></header>
+    <header className={common.header}><div><h1>Détail de la demande</h1><p>Informations transmises par le membre.</p></div><Link className={common.secondary} href="/vendeur/recherches">Retour aux demandes</Link></header>
     {loading && <p>Chargement de la demande…</p>}
     {error && <p className={common.error} role="alert">{error}</p>}
     {!loading && !error && !demand && <p className={common.message}>Cette demande est introuvable.</p>}

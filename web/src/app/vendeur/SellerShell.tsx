@@ -7,29 +7,30 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import styles from "./vendeur.module.css";
 
-const ALLOWED_ROLES = ["SELLER", "SELLER_PRO", "ADMIN"];
+const SELLER_ROLES = ["SELLER", "SELLER_PRO", "ADMIN"];
 
 type SellerShellProps = {
   active: string;
   children: React.ReactNode;
+  allowedRoles?: string[];
 };
 
-export default function SellerShell({ children }: SellerShellProps) {
+export default function SellerShell({ children, allowedRoles = SELLER_ROLES }: SellerShellProps) {
   const { user, isLoading, logout } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
-    if (!isLoading && (!user || !ALLOWED_ROLES.includes(user.role))) {
+    if (!isLoading && (!user || !allowedRoles.includes(user.role))) {
       router.push("/connexion");
     }
-  }, [isLoading, user, router]);
+  }, [allowedRoles, isLoading, user, router]);
 
   const handleLogout = async () => {
     await logout();
     router.push("/connexion");
   };
 
-  if (isLoading || !user || !ALLOWED_ROLES.includes(user.role)) {
+  if (isLoading || !user || !allowedRoles.includes(user.role)) {
     return (
       <main className={styles.profilePage}>
         <div style={{ padding: 60, textAlign: "center", color: "var(--muted, #6b7280)" }}>

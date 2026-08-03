@@ -18,7 +18,7 @@ import {
 import styles from "./detail.module.css";
 
 const ROLE_LABELS: Record<string, string> = {
-  BUYER: "Acheteur",
+  BUYER: "Membre OKKAZ",
   SELLER: "Vendeur",
   SELLER_PRO: "Vendeur Pro",
   ADMIN: "Équipe OKKAZ",
@@ -203,7 +203,7 @@ function AdDetailContent() {
     });
   };
 
-  const handleRevealContact = async () => {
+  const handleRevealContact = useCallback(async () => {
     if (!listing) return;
     setIsRevealing(true);
     setContactError(null);
@@ -214,7 +214,7 @@ function AdDetailContent() {
       if (err instanceof ApiError) {
         if (err.status === 401) setContactError("Connectez-vous pour voir le numéro de contact.");
         else if (err.code === "INSUFFICIENT_ROLE")
-          setContactError("La mise en relation est réservée aux comptes acheteurs.");
+          setContactError("Votre compte ne peut pas encore accéder à cette mise en relation.");
         else setContactError(err.message);
       } else {
         setContactError("Impossible de récupérer le contact. Réessayez plus tard.");
@@ -222,7 +222,13 @@ function AdDetailContent() {
     } finally {
       setIsRevealing(false);
     }
-  };
+  }, [listing]);
+
+  useEffect(() => {
+    if (!user || !listing || contact || contactError || isRevealing) return;
+    const timer = window.setTimeout(() => void handleRevealContact(), 0);
+    return () => window.clearTimeout(timer);
+  }, [contact, contactError, handleRevealContact, isRevealing, listing, user]);
 
   const handleSubmitReview = async (event: FormEvent) => {
     event.preventDefault();
@@ -304,7 +310,6 @@ function AdDetailContent() {
   const ownerRole = listing.owner ? ROLE_LABELS[listing.owner.role] ?? listing.owner.role : "";
   const periodLabel = RENTAL_PERIOD_LABELS[listing.rentalPeriod];
   const averageStars = Math.round(reviewStats.average);
-  const isBuyer = user?.role === "BUYER";
   const whatsappNumber = contact ? contact.contactPhone.replace(/\D/g, "") : null;
 
   return (
@@ -453,17 +458,10 @@ function AdDetailContent() {
             <>
               <div className={styles.actions}>
                 <Link href="/connexion" className={styles.btnPrimary} style={{ width: "100%" }}>
-                  Se connecter pour voir le contact
+                  Se connecter pour contacter le vendeur
                 </Link>
               </div>
-              <p className={styles.lockedContact}>
-                Connectez-vous pour afficher le numéro de mise en relation.
-              </p>
             </>
-          ) : !isBuyer ? (
-            <p className={styles.lockedContact}>
-              La mise en relation est réservée aux comptes acheteurs.
-            </p>
           ) : contact ? (
             <>
               <div className={styles.contactBlock}>
@@ -495,22 +493,7 @@ function AdDetailContent() {
               )}
             </>
           ) : (
-            <>
-              <div className={styles.actions}>
-                <button
-                  type="button"
-                  className={styles.btnPrimary}
-                  style={{ width: "100%", border: "none", cursor: "pointer", font: "inherit", fontWeight: 760 }}
-                  onClick={handleRevealContact}
-                  disabled={isRevealing}
-                >
-                  {isRevealing ? "Récupération du contact…" : "Afficher le numéro de contact"}
-                </button>
-              </div>
-              <p className={styles.lockedContact}>
-                OKKAZ affiche un numéro de mise en relation pour sécuriser les échanges.
-              </p>
-            </>
+            <p className={styles.lockedContact}>Chargement du contact...</p>
           )}
           {contactError && <p className={styles.formError}>{contactError}</p>}
 

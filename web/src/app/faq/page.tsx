@@ -4,8 +4,8 @@ import styles from "./faq.module.css";
 
 const FAQS = [
   [
-    "Comment réserver un bien ?",
-    "Ouvrez l'annonce, vérifiez les détails, puis contactez OKKAZ pour confirmer les conditions avec le propriétaire.",
+    "Comment contacter pour un bien ?",
+    "Ouvrez l'annonce puis affichez gratuitement le contact. Vous pourrez ensuite discuter directement sur WhatsApp avec le vendeur ou via le numéro OKKAZ affiché.",
   ],
   [
     "L'option Achat / Vente est-elle disponible pour tous les biens ?",
@@ -14,6 +14,10 @@ const FAQS = [
   [
     "Comment publier un bien sur OKKAZ ?",
     "Depuis l'espace publication, ajoutez les photos, le prix, les disponibilités et les conditions de location.",
+  ],
+  [
+    "Quels services sont payants ?",
+    "Seuls l'abonnement vendeur, qui affiche automatiquement son numéro personnel, et la publication d'une demande de bien sont payants. Consulter et contacter une annonce reste gratuit.",
   ],
   [
     "Comment OKKAZ sécurise les échanges ?",

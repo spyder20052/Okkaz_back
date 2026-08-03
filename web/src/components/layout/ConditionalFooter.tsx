@@ -16,6 +16,8 @@ export default function ConditionalFooter() {
     !pathname.startsWith("/verifier-email/") &&
     !pathname.startsWith("/admin") &&
     !pathname.startsWith("/vendeur") &&
+    !pathname.startsWith("/demandes") &&
+    !pathname.startsWith("/paiement") &&
     !pathname.startsWith("/annonces/");
 
   if (!shouldShowFooter) return null;

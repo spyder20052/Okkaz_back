@@ -22,7 +22,7 @@ router.get('/:id', validateRequest({ params: schemas.listingIdParamSchema }), as
 router.post(
   '/:id/contact',
   authenticate,
-  authorize('BUYER', 'SELLER', 'SELLER_PRO'),
+  authorize('BUYER', 'SELLER', 'SELLER_PRO', 'ADMIN'),
   validateRequest({ params: schemas.listingIdParamSchema }),
   asyncHandler(controller.revealContact),
 );

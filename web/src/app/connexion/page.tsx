@@ -14,7 +14,7 @@ type Mode = "login" | "register";
 function homeForRole(user: ApiUser): string {
   if (user.role === "ADMIN") return "/admin";
   if (user.role === "SELLER" || user.role === "SELLER_PRO") return "/vendeur";
-  return "/annonces";
+  return "/demandes";
 }
 
 export default function ConnexionPage() {
@@ -236,16 +236,19 @@ export default function ConnexionPage() {
                 className={role === "BUYER" ? styles.roleActive : styles.roleBtn}
                 onClick={() => setRole("BUYER")}
               >
-                Je cherche à louer
+                Compte personnel
               </button>
               <button
                 type="button"
                 className={role === "SELLER" ? styles.roleActive : styles.roleBtn}
                 onClick={() => setRole("SELLER")}
               >
-                Je veux publier des biens
+                Je veux aussi publier
               </button>
             </div>
+            <p className={styles.subtitle} style={{ margin: 0 }}>
+              Tous les comptes peuvent consulter, demander, contacter et payer. Le compte vendeur ajoute la publication de biens.
+            </p>
             <button type="submit" className={styles.btnApple} disabled={isSubmitting}>
               {isSubmitting ? "Création…" : "Créer mon compte"}
             </button>
