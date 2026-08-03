@@ -56,15 +56,18 @@ export interface OpenKkiapayOptions {
 }
 
 // Ouvre le widget KKiaPay pour un paiement initié côté backend (providerRef).
-// Sans clé publique configurée (NEXT_PUBLIC_KKIAPAY_PUBLIC_KEY vide), le widget
-// est court-circuité et onSuccess est appelé directement : le flux continue vers
-// le polling — utile avec le serveur mock (mock/server.mjs) qui confirme les
-// paiements automatiquement.
+// Le mode simulé doit être activé explicitement et reste interdit en production.
 export async function openKkiapay({ amount, providerRef, onSuccess, onFailed }: OpenKkiapayOptions): Promise<void> {
   if (!process.env.NEXT_PUBLIC_KKIAPAY_PUBLIC_KEY) {
-    console.warn("[kkiapay] Aucune clé publique configurée — widget simulé (mode mock).");
-    setTimeout(() => onSuccess({ transactionId: `mock_${providerRef}` }), 300);
-    return;
+    const mockEnabled =
+      process.env.NODE_ENV !== "production" &&
+      process.env.NEXT_PUBLIC_ENABLE_PAYMENT_MOCK === "true";
+    if (mockEnabled) {
+      console.warn("[kkiapay] Paiement simulé explicitement en développement.");
+      setTimeout(() => onSuccess({ transactionId: `mock_${providerRef}` }), 300);
+      return;
+    }
+    throw new Error("La clé publique KKiaPay n'est pas configurée.");
   }
   await loadKkiapayScript();
   if (!window.openKkiapayWidget) {

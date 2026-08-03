@@ -12,6 +12,24 @@ Ce document suit les tâches restantes après l'intégration du frontend Next.js
 - Frontend : typage, lint et build réussis
 - Backend : typage, lint et build réussis
 
+## Frontend — avancement
+
+- [x] Connecter les pages principales à l'API réelle.
+- [x] Ouvrir les parcours de consultation à tous les rôles connectés.
+- [x] Afficher automatiquement le numéro vendeur ou le numéro OKKAZ.
+- [x] Aligner les pages « Mes demandes » et « Décrire mon besoin » sur l'espace applicatif.
+- [x] Retirer les anciens parcours de réservation et de paiement avant contact.
+- [x] Masquer les footers sur les pages applicatives.
+- [x] Ajouter un modèle `web/.env.production.example`.
+- [x] Accepter les images du domaine API et de Cloudinary dans Next.js.
+- [x] Interdire la simulation KKiaPay implicite en production.
+- [x] Faire échouer un build de production sans `NEXT_PUBLIC_API_URL`.
+- [ ] Renseigner les vraies variables frontend sur l'hébergeur.
+- [ ] Tester le widget KKiaPay avec une vraie clé sandbox.
+- [ ] Tester visuellement toutes les pages sur téléphone, tablette et ordinateur.
+- [ ] Tester les parcours complets dans Safari, Chrome et Firefox.
+- [ ] Ajouter une supervision des erreurs frontend en production.
+
 ## Priorité 1 — Comptes et secrets externes
 
 - [ ] Créer ou sélectionner le compte Cloudinary de production.

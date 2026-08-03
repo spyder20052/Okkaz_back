@@ -2,8 +2,13 @@
 // - Attache automatiquement le Bearer token
 // - Rafraîchit le token sur 401 (une seule tentative) puis rejoue la requête
 // - Normalise les erreurs backend ({ success:false, error:{ code, message, details } })
-export const API_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000/api/v1";
+const configuredApiUrl = process.env.NEXT_PUBLIC_API_URL;
+
+if (process.env.NODE_ENV === "production" && !configuredApiUrl) {
+  throw new Error("NEXT_PUBLIC_API_URL doit être configurée pour le build de production.");
+}
+
+export const API_URL = (configuredApiUrl ?? "http://localhost:3000/api/v1").replace(/\/$/, "");
 
 // Origine du backend (pour préfixer les URLs relatives /uploads/...)
 export const API_ORIGIN = API_URL.replace(/\/api\/v\d+\/?$/, "");
