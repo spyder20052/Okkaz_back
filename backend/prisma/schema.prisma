@@ -1,0 +1,473 @@
+// =============================================================================
+// OKKAZ Backend — Prisma Schema
+// -----------------------------------------------------------------------------
+// Conforme au Cahier des Charges Technique Backend v1.0 (Avril 2026).
+// Conventions :
+//   - Clés primaires UUID (DEFAULT gen_random_uuid())
+//   - Timestamps created_at / updated_at sur chaque table
+//   - Soft delete (deleted_at) sur entités sensibles (users, listings)
+//   - Tables snake_case pluriel, colonnes snake_case
+//   - Cartographie @map pour respecter les conventions PostgreSQL côté DB
+//     tout en conservant du camelCase côté TypeScript.
+// =============================================================================
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// -----------------------------------------------------------------------------
+// ENUMS
+// -----------------------------------------------------------------------------
+
+enum UserRole {
+  BUYER
+  SELLER
+  SELLER_PRO
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  BLOCKED
+  PENDING_KYC
+}
+
+enum KycStatus {
+  NONE
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum KycDocumentType {
+  ID_CARD
+  PASSPORT
+  DRIVER_LICENSE
+}
+
+enum KycDocumentStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum RentalPeriod {
+  DAY
+  WEEK
+  MONTH
+}
+
+enum ListingCondition {
+  NEW
+  GOOD
+  FAIR
+}
+
+enum ListingStatus {
+  PENDING
+  ACTIVE
+  REJECTED
+  PAUSED
+  DELETED
+}
+
+enum SubscriptionPlan {
+  WEEKLY
+  MONTHLY
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  EXPIRED
+  CANCELLED
+}
+
+enum PaymentType {
+  SUBSCRIPTION
+  DEMAND_LISTING
+  EXPRESS_DEMAND
+}
+
+enum PaymentMethod {
+  MOBILE_MONEY
+  CARD
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  REFUNDED
+}
+
+enum ReportReason {
+  FRAUD
+  WRONG_INFO
+  INAPPROPRIATE
+  NO_RESPONSE
+  OTHER
+}
+
+enum ReportStatus {
+  OPEN
+  REVIEWED
+  CLOSED
+}
+
+enum DemandType {
+  STANDARD
+  EXPRESS
+}
+
+enum DemandStatus {
+  ACTIVE
+  CLOSED
+  EXPIRED
+}
+
+// -----------------------------------------------------------------------------
+// MODELS
+// -----------------------------------------------------------------------------
+
+/// §3.1 — Utilisateurs (locataires, propriétaires, admins).
+model User {
+  id                       String     @id @default(uuid()) @db.Uuid
+  email                    String     @unique @db.VarChar(255)
+  phone                    String?    @unique @db.VarChar(20)
+  passwordHash             String?    @map("password_hash") @db.VarChar(255)
+  googleId                 String?    @unique @map("google_id") @db.VarChar(64)
+  firstName                String     @map("first_name") @db.VarChar(100)
+  lastName                 String     @map("last_name") @db.VarChar(100)
+  role                     UserRole   @default(BUYER)
+  status                   UserStatus @default(ACTIVE)
+  kycStatus                KycStatus  @default(NONE) @map("kyc_status")
+  profilePhotoUrl          String?    @map("profile_photo_url") @db.VarChar(500)
+  address                  String?    @db.Text
+  city                     String?    @db.VarChar(100)
+  reportsCount             Int        @default(0) @map("reports_count")
+  isEmailVerified          Boolean    @default(false) @map("is_email_verified")
+  emailVerificationToken   String?    @map("email_verification_token") @db.VarChar(255)
+  resetPasswordToken       String?    @map("reset_password_token") @db.VarChar(255)
+  resetPasswordExpiresAt   DateTime?  @map("reset_password_expires_at") @db.Timestamptz(6)
+  lastLoginAt              DateTime?  @map("last_login_at") @db.Timestamptz(6)
+  createdAt                DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt                DateTime?  @map("deleted_at") @db.Timestamptz(6)
+
+  // Relations
+  kycDocuments             KycDocument[]      @relation("KycOwner")
+  reviewedKycDocuments     KycDocument[]      @relation("KycReviewer")
+  listings                 Listing[]          @relation("ListingOwner")
+  validatedListings        Listing[]          @relation("ListingValidator")
+  subscriptions            Subscription[]
+  contactReveals           ContactReveal[]
+  payments                 Payment[]
+  reportsMade              Report[]           @relation("ReportAuthor")
+  reportsReceived          Report[]           @relation("ReportedUser")
+  reviewedReports          Report[]           @relation("ReportReviewer")
+  reviews                  Review[]
+  demandListings           DemandListing[]    @relation("DemandOwner")
+  assignedDemands          DemandListing[]    @relation("DemandAdvisor")
+  refreshTokens            RefreshToken[]
+  systemSettingsUpdates    SystemSetting[]    @relation("SettingUpdater")
+
+  @@index([status])
+  @@index([role])
+  @@index([kycStatus])
+  @@map("users")
+}
+
+/// §3.2 — Documents d'identité soumis pour validation KYC.
+model KycDocument {
+  id               String             @id @default(uuid()) @db.Uuid
+  userId           String             @map("user_id") @db.Uuid
+  documentType     KycDocumentType    @map("document_type")
+  frontUrl         String             @map("front_url") @db.VarChar(500)
+  backUrl          String?            @map("back_url") @db.VarChar(500)
+  status           KycDocumentStatus  @default(PENDING)
+  rejectionReason  String?            @map("rejection_reason") @db.Text
+  reviewedBy       String?            @map("reviewed_by") @db.Uuid
+  reviewedAt       DateTime?          @map("reviewed_at") @db.Timestamptz(6)
+  createdAt        DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user             User               @relation("KycOwner", fields: [userId], references: [id], onDelete: Cascade)
+  reviewer         User?              @relation("KycReviewer", fields: [reviewedBy], references: [id])
+
+  @@index([userId])
+  @@index([status])
+  @@map("kyc_documents")
+}
+
+/// §3.3 — Catégories de biens (hiérarchiques).
+model Category {
+  id          String     @id @default(uuid()) @db.Uuid
+  name        String     @db.VarChar(100)
+  slug        String     @unique @db.VarChar(100)
+  description String?    @db.Text
+  iconUrl     String?    @map("icon_url") @db.VarChar(500)
+  parentId    String?    @map("parent_id") @db.Uuid
+  isActive    Boolean    @default(true) @map("is_active")
+  sortOrder   Int        @default(0) @map("sort_order")
+  createdAt   DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  parent      Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children    Category[] @relation("CategoryHierarchy")
+  listings    Listing[]
+  demands     DemandListing[]
+
+  @@index([parentId])
+  @@index([isActive])
+  @@map("categories")
+}
+
+/// §3.4 — Annonces de location (table centrale).
+/// SECURITE : contact_phone stocké chiffré (AES-256-GCM). Ne jamais
+/// retourner directement via GET /listings/:id — uniquement après validation
+/// d'un ContactAccess (cf. §5.3 et §4.6).
+model Listing {
+  id                String            @id @default(uuid()) @db.Uuid
+  userId            String            @map("user_id") @db.Uuid
+  categoryId        String            @map("category_id") @db.Uuid
+  title             String            @db.VarChar(255)
+  slug              String            @unique @db.VarChar(300)
+  description       String            @db.Text
+  rentalPrice       Decimal           @map("rental_price") @db.Decimal(12, 2)
+  rentalPeriod      RentalPeriod      @map("rental_period")
+  purchasePrice     Decimal?          @map("purchase_price") @db.Decimal(12, 2)
+  isLoa             Boolean           @default(false) @map("is_loa")
+  loaDurationMonths Int?              @map("loa_duration_months")
+  condition         ListingCondition
+  locationCity      String            @map("location_city") @db.VarChar(100)
+  locationAddress   String?           @map("location_address") @db.Text
+  contactPhone      String            @map("contact_phone") @db.VarChar(500) // chiffré AES-256 → longueur élargie
+  contactPhoneWcc   String            @map("contact_phone_wcc") @db.VarChar(20)
+  status            ListingStatus     @default(PENDING)
+  isFeatured        Boolean           @default(false) @map("is_featured")
+  isUrgent          Boolean           @default(false) @map("is_urgent")
+  viewsCount        Int               @default(0) @map("views_count")
+  contactsCount     Int               @default(0) @map("contacts_count")
+  rejectionReason   String?           @map("rejection_reason") @db.Text
+  validatedBy       String?           @map("validated_by") @db.Uuid
+  validatedAt       DateTime?         @map("validated_at") @db.Timestamptz(6)
+  expiresAt         DateTime?         @map("expires_at") @db.Timestamptz(6)
+  createdAt         DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt         DateTime?         @map("deleted_at") @db.Timestamptz(6)
+
+  owner             User              @relation("ListingOwner", fields: [userId], references: [id])
+  validator         User?             @relation("ListingValidator", fields: [validatedBy], references: [id])
+  category          Category          @relation(fields: [categoryId], references: [id])
+  photos            ListingPhoto[]
+  contactReveals    ContactReveal[]
+  reports           Report[]
+  reviews           Review[]
+
+  @@index([userId])
+  @@index([categoryId])
+  @@index([status])
+  @@index([isFeatured])
+  @@index([locationCity])
+  @@index([createdAt(sort: Desc)])
+  @@map("listings")
+}
+
+/// §3.5 — Photos d'annonces. Max 4 pour SELLER, illimité pour SELLER_PRO.
+model ListingPhoto {
+  id        String   @id @default(uuid()) @db.Uuid
+  listingId String   @map("listing_id") @db.Uuid
+  url       String   @db.VarChar(500)
+  sortOrder Int      @default(0) @map("sort_order")
+  isCover   Boolean  @default(false) @map("is_cover")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  listing   Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@index([listingId])
+  @@map("listing_photos")
+}
+
+/// §3.6 — Abonnements Premium propriétaires.
+model Subscription {
+  id         String             @id @default(uuid()) @db.Uuid
+  userId     String             @map("user_id") @db.Uuid
+  plan       SubscriptionPlan
+  amount     Decimal            @db.Decimal(12, 2)
+  status     SubscriptionStatus @default(ACTIVE)
+  paymentId  String             @unique @map("payment_id") @db.Uuid
+  startsAt   DateTime           @map("starts_at") @db.Timestamptz(6)
+  endsAt     DateTime           @map("ends_at") @db.Timestamptz(6)
+  autoRenew  Boolean            @default(false) @map("auto_renew")
+  createdAt  DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user       User               @relation(fields: [userId], references: [id])
+  payment    Payment            @relation(fields: [paymentId], references: [id])
+
+  @@index([userId])
+  @@index([status])
+  @@index([endsAt])
+  @@map("subscriptions")
+}
+
+/// §3.7 — Consultations (gratuites) des coordonnées d'une annonce.
+/// Trace l'interaction d'un locataire avec un contact (aucun paiement associé).
+/// Conditionne la possibilité de laisser un avis (cf. §4.9).
+/// Une seule entrée par couple (utilisateur, annonce).
+model ContactReveal {
+  id                    String    @id @default(uuid()) @db.Uuid
+  userId                String    @map("user_id") @db.Uuid
+  listingId             String    @map("listing_id") @db.Uuid
+  reviewReminderSentAt  DateTime? @map("review_reminder_sent_at") @db.Timestamptz(6)
+  createdAt             DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  listing    Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, listingId])
+  @@index([userId])
+  @@index([listingId])
+  @@index([reviewReminderSentAt])
+  @@map("contact_reveals")
+}
+
+/// §3.8 — Paiements unifiés (accès contact, abonnement, demandes).
+model Payment {
+  id            String         @id @default(uuid()) @db.Uuid
+  userId        String         @map("user_id") @db.Uuid
+  type          PaymentType
+  amount        Decimal        @db.Decimal(12, 2)
+  currency      String         @default("XOF") @db.VarChar(10)
+  method        PaymentMethod
+  provider      String?        @db.VarChar(50)
+  providerRef   String?        @unique @map("provider_ref") @db.VarChar(255)
+  status        PaymentStatus  @default(PENDING)
+  metadata      Json?
+  createdAt     DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user          User           @relation(fields: [userId], references: [id])
+  subscription  Subscription?
+  demandListing DemandListing?
+
+  @@index([userId])
+  @@index([status])
+  @@index([type])
+  @@index([createdAt(sort: Desc)])
+  @@map("payments")
+}
+
+/// §3.9 — Signalements (avec automate d'auto-suspension à 5 signalements).
+model Report {
+  id              String        @id @default(uuid()) @db.Uuid
+  reporterId      String        @map("reporter_id") @db.Uuid
+  reportedUserId  String?       @map("reported_user_id") @db.Uuid
+  listingId       String?       @map("listing_id") @db.Uuid
+  reason          ReportReason
+  description     String?       @db.Text
+  status          ReportStatus  @default(OPEN)
+  reviewedBy      String?       @map("reviewed_by") @db.Uuid
+  adminNote       String?       @map("admin_note") @db.Text
+  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  reporter        User          @relation("ReportAuthor", fields: [reporterId], references: [id])
+  reportedUser    User?         @relation("ReportedUser", fields: [reportedUserId], references: [id])
+  listing         Listing?      @relation(fields: [listingId], references: [id])
+  reviewer        User?         @relation("ReportReviewer", fields: [reviewedBy], references: [id])
+
+  @@index([reporterId])
+  @@index([reportedUserId])
+  @@index([listingId])
+  @@index([status])
+  @@map("reports")
+}
+
+/// §3.10 — Avis. Un seul par (reviewer, listing).
+model Review {
+  id           String   @id @default(uuid()) @db.Uuid
+  reviewerId   String   @map("reviewer_id") @db.Uuid
+  listingId    String   @map("listing_id") @db.Uuid
+  rating       Int      @db.SmallInt
+  comment      String?  @db.Text
+  isModerated  Boolean  @default(false) @map("is_moderated")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  reviewer     User     @relation(fields: [reviewerId], references: [id])
+  listing      Listing  @relation(fields: [listingId], references: [id])
+
+  @@unique([reviewerId, listingId])
+  @@index([listingId])
+  @@map("reviews")
+}
+
+/// §3.11 — Demandes « Je recherche ».
+model DemandListing {
+  id                 String        @id @default(uuid()) @db.Uuid
+  userId             String        @map("user_id") @db.Uuid
+  categoryId         String        @map("category_id") @db.Uuid
+  title              String        @db.VarChar(255)
+  description        String        @db.Text
+  maxBudget          Decimal?      @map("max_budget") @db.Decimal(12, 2)
+  city               String        @db.VarChar(100)
+  type               DemandType    @default(STANDARD)
+  isUrgent           Boolean       @default(false) @map("is_urgent")
+  paymentId          String        @unique @map("payment_id") @db.Uuid
+  status             DemandStatus  @default(ACTIVE)
+  expiresAt          DateTime      @map("expires_at") @db.Timestamptz(6)
+  assignedAdvisorId  String?       @map("assigned_advisor_id") @db.Uuid
+  createdAt          DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user               User          @relation("DemandOwner", fields: [userId], references: [id])
+  advisor            User?         @relation("DemandAdvisor", fields: [assignedAdvisorId], references: [id])
+  category           Category      @relation(fields: [categoryId], references: [id])
+  payment            Payment       @relation(fields: [paymentId], references: [id])
+
+  @@index([userId])
+  @@index([categoryId])
+  @@index([status])
+  @@index([type])
+  @@map("demand_listings")
+}
+
+/// §3.12 — Paramètres globaux configurables par l'administrateur.
+model SystemSetting {
+  id           String   @id @default(uuid()) @db.Uuid
+  key          String   @unique @db.VarChar(100)
+  value        String   @db.Text
+  description  String?  @db.Text
+  updatedBy    String?  @map("updated_by") @db.Uuid
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  updater      User?    @relation("SettingUpdater", fields: [updatedBy], references: [id])
+
+  @@map("system_settings")
+}
+
+/// Table technique : refresh tokens JWT (§5.2).
+/// Non listée au §3, mais requise par le spec sécurité : rotation à chaque
+/// usage, stockage en DB pour invalidation lors du logout.
+model RefreshToken {
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  tokenHash  String    @unique @map("token_hash") @db.VarChar(255)
+  expiresAt  DateTime  @map("expires_at") @db.Timestamptz(6)
+  revokedAt  DateTime? @map("revoked_at") @db.Timestamptz(6)
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("refresh_tokens")
+}
