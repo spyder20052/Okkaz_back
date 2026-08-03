@@ -1,0 +1,810 @@
+openapi: "3.1.0"
+info:
+  title: OKKAZ API
+  version: "1.0.0"
+  description: |
+    API REST de la marketplace OKKAZ — location de biens au Bénin.
+    Authentification : Bearer JWT (access token 15min).
+    Toutes les réponses suivent le format :
+      `{ success: true, data, message?, meta? }` (succès)
+      `{ success: false, error: { code, message, details? } }` (erreur)
+  contact:
+    name: KOUTON Spynel
+    email: kspynel@gmail.com
+
+servers:
+  - url: http://localhost:3000/api/v1
+    description: Développement local
+  - url: https://api.okkaz.bj/api/v1
+    description: Production
+
+tags:
+  - name: Auth
+  - name: Users
+  - name: KYC
+  - name: Categories
+  - name: Listings
+  - name: Payments
+  - name: Subscriptions
+  - name: Reports
+  - name: Reviews
+  - name: Demands
+  - name: Admin
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          description: Payload de la réponse
+        message:
+          type: string
+
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              example: RESOURCE_NOT_FOUND
+            message:
+              type: string
+            details:
+              description: Détails de validation (optionnel)
+
+    PaginationMeta:
+      type: object
+      properties:
+        page:
+          type: integer
+        limit:
+          type: integer
+        total:
+          type: integer
+        totalPages:
+          type: integer
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+        phone:
+          type: string
+        firstName:
+          type: string
+        lastName:
+          type: string
+        role:
+          type: string
+          enum: [BUYER, SELLER, SELLER_PRO, ADMIN]
+        status:
+          type: string
+          enum: [ACTIVE, SUSPENDED, BLOCKED, PENDING_KYC]
+        kycStatus:
+          type: string
+          enum: [NONE, PENDING, APPROVED, REJECTED]
+        isEmailVerified:
+          type: boolean
+
+    Listing:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        slug:
+          type: string
+        rentalPrice:
+          type: number
+        rentalPeriod:
+          type: string
+          enum: [DAY, WEEK, MONTH]
+        condition:
+          type: string
+          enum: [NEW, GOOD, FAIR]
+        locationCity:
+          type: string
+        status:
+          type: string
+          enum: [PENDING, ACTIVE, REJECTED, PAUSED, DELETED]
+        isFeatured:
+          type: boolean
+        viewsCount:
+          type: integer
+        contactsCount:
+          type: integer
+
+paths:
+  /health:
+    get:
+      summary: Health check
+      responses:
+        "200":
+          description: API opérationnelle
+
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Inscription d'un nouvel utilisateur
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [firstName, lastName, email, phone, password]
+              properties:
+                firstName:
+                  type: string
+                lastName:
+                  type: string
+                email:
+                  type: string
+                  format: email
+                phone:
+                  type: string
+                password:
+                  type: string
+                  minLength: 8
+                role:
+                  type: string
+                  enum: [BUYER, SELLER]
+                  default: BUYER
+      responses:
+        "201":
+          description: Inscription réussie
+        "409":
+          description: Email ou téléphone déjà utilisé
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Connexion (email ou téléphone + mot de passe)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [password]
+              properties:
+                email:
+                  type: string
+                phone:
+                  type: string
+                password:
+                  type: string
+      responses:
+        "200":
+          description: Connexion réussie (retourne accessToken + refreshToken)
+        "401":
+          description: Identifiants invalides
+
+  /auth/refresh-token:
+    post:
+      tags: [Auth]
+      summary: Renouveler les tokens
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refreshToken]
+              properties:
+                refreshToken:
+                  type: string
+      responses:
+        "200":
+          description: Nouveaux tokens émis
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Déconnexion (révoque le refresh token)
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Déconnecté
+
+  /auth/verify-email/{token}:
+    get:
+      tags: [Auth]
+      summary: Vérifier l'adresse email
+      parameters:
+        - in: path
+          name: token
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Email vérifié
+
+  /auth/forgot-password:
+    post:
+      tags: [Auth]
+      summary: Demande de réinitialisation de mot de passe
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+      responses:
+        "200":
+          description: Email envoyé (si compte existant)
+
+  /auth/reset-password/{token}:
+    post:
+      tags: [Auth]
+      summary: Réinitialiser le mot de passe
+      parameters:
+        - in: path
+          name: token
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                newPassword:
+                  type: string
+      responses:
+        "200":
+          description: Mot de passe réinitialisé
+
+  /users/me:
+    get:
+      tags: [Users]
+      summary: Profil de l'utilisateur connecté
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Profil utilisateur
+    patch:
+      tags: [Users]
+      summary: Mettre à jour son profil
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Profil mis à jour
+
+  /users/me/password:
+    patch:
+      tags: [Users]
+      summary: Changer son mot de passe
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Mot de passe modifié
+
+  /users/{id}/public:
+    get:
+      tags: [Users]
+      summary: Profil public d'un utilisateur
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Profil public avec annonces actives et notes
+
+  /kyc/upload:
+    post:
+      tags: [KYC]
+      summary: Soumettre un document KYC
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                documentType:
+                  type: string
+                  enum: [ID_CARD, PASSPORT, DRIVER_LICENSE]
+                front_file:
+                  type: string
+                  format: binary
+                back_file:
+                  type: string
+                  format: binary
+      responses:
+        "201":
+          description: Document soumis
+
+  /categories:
+    get:
+      tags: [Categories]
+      summary: Liste des catégories actives (hiérarchique)
+      responses:
+        "200":
+          description: Catégories avec sous-catégories
+
+  /listings:
+    get:
+      tags: [Listings]
+      summary: Liste des annonces actives (filtrée, paginée)
+      parameters:
+        - in: query
+          name: categoryId
+          schema:
+            type: string
+        - in: query
+          name: city
+          schema:
+            type: string
+        - in: query
+          name: minPrice
+          schema:
+            type: number
+        - in: query
+          name: maxPrice
+          schema:
+            type: number
+        - in: query
+          name: sort
+          schema:
+            type: string
+            enum: [recent, price_asc, price_desc, featured]
+        - in: query
+          name: q
+          schema:
+            type: string
+        - in: query
+          name: page
+          schema:
+            type: integer
+        - in: query
+          name: limit
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Liste paginée d'annonces
+    post:
+      tags: [Listings]
+      summary: Créer une annonce (SELLER/SELLER_PRO)
+      security:
+        - bearerAuth: []
+      responses:
+        "201":
+          description: Annonce créée (statut PENDING)
+
+  /listings/{id}:
+    get:
+      tags: [Listings]
+      summary: Détail d'une annonce (contact affiché = WCC)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Détail annonce
+    patch:
+      tags: [Listings]
+      summary: Mettre à jour une annonce
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Annonce mise à jour
+    delete:
+      tags: [Listings]
+      summary: Supprimer une annonce (soft delete)
+      security:
+        - bearerAuth: []
+      responses:
+        "204":
+          description: Supprimée
+
+  /payments/initiate-contact-access:
+    post:
+      tags: [Payments]
+      summary: Initier un paiement pour accéder au contact d'une annonce
+      description: Crée une transaction en attente et retourne un `paymentId` à utiliser pour initialiser le widget Kkiapay.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [listingId, method]
+              properties:
+                listingId:
+                  type: string
+                  format: uuid
+                  description: L'ID de l'annonce pour laquelle on veut le contact.
+                method:
+                  type: string
+                  enum: [MOBILE_MONEY, CARD]
+                  description: Méthode de paiement choisie.
+      responses:
+        "201":
+          description: Paiement initié avec succès.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        "400":
+          description: Le statut de l'annonce ne permet pas l'achat du contact ou requête invalide.
+        "404":
+          description: Annonce non trouvée.
+
+  /payments/webhook:
+    post:
+      tags: [Payments]
+      summary: Webhook de notification Kkiapay
+      description: Route appelée par Kkiapay pour confirmer le statut d'un paiement. Protégée par le secret configuré dans le dashboard Kkiapay.
+      parameters:
+        - in: header
+          name: x-kkiapay-secret
+          required: true
+          schema:
+            type: string
+          description: Le secret du Webhook Kkiapay pour authentifier la requête.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  description: Le statut de la transaction (ex. "SUCCESS", "FAILED").
+                transactionId:
+                  type: string
+                  description: L'ID unique de la transaction chez Kkiapay.
+                isPaymentSucces:
+                  type: boolean
+                  description: Indique si le paiement a réussi.
+                partnerId:
+                  type: string
+                  description: L'ID de la transaction interne fourni lors de l'initialisation du widget (le `paymentId` retourné par `/initiate-contact-access`).
+                stateData:
+                  type: string
+                  description: Données d'état supplémentaires (URL-encoded JSON). Utilisé en fallback si `partnerId` n'est pas présent à la racine.
+      responses:
+        "200":
+          description: Webhook traité avec succès.
+        "401":
+          description: Secret Kkiapay invalide ou manquant.
+
+  /payments/contact-access/{listing_id}:
+    get:
+      tags: [Payments]
+      summary: Obtenir le contact réel d'une annonce
+      description: Retourne le numéro de téléphone masqué après vérification qu'un paiement valide a été effectué.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: listing_id
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: L'ID de l'annonce.
+      responses:
+        "200":
+          description: Accès autorisé. Retourne les informations de contact de l'annonce.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      listingId:
+                        type: string
+                      contactPhone:
+                        type: string
+                        description: Le numéro de contact réel.
+                      expiresAt:
+                        type: string
+                        format: date-time
+        "403":
+          description: Accès refusé (aucun paiement complété pour cette annonce).
+        "404":
+          description: Annonce introuvable.
+
+  /admin/listings/pending:
+    get:
+      tags: [Admin]
+      summary: Liste des annonces en attente de validation
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Annonces PENDING paginées
+
+  /admin/listings/{id}/approve:
+    patch:
+      tags: [Admin]
+      summary: Approuver une annonce
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Annonce approuvée (statut ACTIVE)
+
+  /admin/listings/{id}/reject:
+    patch:
+      tags: [Admin]
+      summary: Rejeter une annonce
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Annonce rejetée
+
+  /admin/dashboard:
+    get:
+      tags: [Admin]
+      summary: Statistiques globales du tableau de bord
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: KPIs (utilisateurs, annonces, paiements, top catégories)
+
+  /admin/settings:
+    get:
+      tags: [Admin]
+      summary: Lire tous les paramètres système
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Clé/valeur de tous les paramètres
+    patch:
+      tags: [Admin]
+      summary: Modifier un ou plusieurs paramètres
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Paramètres mis à jour
+
+  /subscriptions/plans:
+    get:
+      tags: [Subscriptions]
+      summary: Plans disponibles
+      responses:
+        "200":
+          description: Liste des plans d'abonnement (prix, durée)
+  /subscriptions/subscribe:
+    post:
+      tags: [Subscriptions]
+      summary: Souscription
+      security:
+        - bearerAuth: []
+      responses:
+        "201":
+          description: Abonnement initié
+  /subscriptions/me:
+    get:
+      tags: [Subscriptions]
+      summary: Mon abonnement
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Détails de l'abonnement actif
+  /subscriptions/cancel:
+    post:
+      tags: [Subscriptions]
+      summary: Désactive le renouvellement
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Renouvellement annulé
+
+  /demands/initiate:
+    post:
+      tags: [Demands]
+      summary: Initie une demande + paiement
+      security:
+        - bearerAuth: []
+      responses:
+        "201":
+          description: Demande initiée (paiement en attente)
+  /demands:
+    get:
+      tags: [Demands]
+      summary: Demandes pro (STD + EXPRESS)
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Liste des demandes
+  /demands/standard:
+    get:
+      tags: [Demands]
+      summary: Demandes STANDARD publiques
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Liste des demandes standard
+  /demands/me:
+    get:
+      tags: [Demands]
+      summary: Mes demandes
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Historique des demandes
+  /demands/{id}:
+    get:
+      tags: [Demands]
+      summary: Détail d'une demande
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Détails de la demande
+  /demands/{id}/close:
+    patch:
+      tags: [Demands]
+      summary: Clôturer une demande
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Demande clôturée
+
+  /reviews:
+    post:
+      tags: [Reviews]
+      summary: Créer un avis (sur une annonce)
+      security:
+        - bearerAuth: []
+      responses:
+        "201":
+          description: Avis créé
+  /reviews/listing/{listing_id}:
+    get:
+      tags: [Reviews]
+      summary: Obtenir tous les avis d'une annonce
+      parameters:
+        - in: path
+          name: listing_id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Liste des avis
+  /reviews/{id}:
+    delete:
+      tags: [Reviews]
+      summary: Supprimer un avis (admin uniquement)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Avis supprimé
+
+  /reports:
+    post:
+      tags: [Reports]
+      summary: Créer un signalement
+      security:
+        - bearerAuth: []
+      responses:
+        "201":
+          description: Signalement créé
+  /reports/admin/list:
+    get:
+      tags: [Reports]
+      summary: Liste paginée des signalements (Admin)
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Liste des signalements
+  /reports/admin/{id}:
+    get:
+      tags: [Reports]
+      summary: Détail d'un signalement (Admin)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Détails du signalement
+  /reports/admin/{id}/review:
+    patch:
+      tags: [Reports]
+      summary: Traiter un signalement (Admin)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Signalement traité
