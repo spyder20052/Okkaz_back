@@ -112,10 +112,10 @@ describe('Users Service (Unit)', () => {
     });
 
     it('doit récupérer mes accès de contact', async () => {
-      prismaMock.contactAccess.findMany.mockResolvedValue([{ id: 'c1' }] as any[]);
-      prismaMock.contactAccess.count.mockResolvedValue(1);
+      prismaMock.contactReveal.findMany.mockResolvedValue([{ id: 'c1' }] as any[]);
+      prismaMock.contactReveal.count.mockResolvedValue(1);
 
-      const result = await usersService.getMyContactAccesses('123', {});
+      const result = await usersService.getMyContactReveals('123', {});
       expect(result.items).toHaveLength(1);
       expect(result.meta.total).toBe(1);
     });

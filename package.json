@@ -1,4 +1,15 @@
 {
+  "private": true,
+  "scripts": {
+    "dev:web": "npm --prefix web run dev",
+    "dev:backend": "npm --prefix backend run dev",
+    "build": "npm --prefix backend run build && npm --prefix web run build",
+    "build:web": "npm --prefix web run build",
+    "build:backend": "npm --prefix backend run build",
+    "lint": "npm --prefix backend run lint && npm --prefix web run lint",
+    "typecheck": "npm --prefix backend run typecheck && npm --prefix web exec tsc -- --noEmit",
+    "test:backend": "npm --prefix backend test"
+  },
   "devDependencies": {
     "js-beautify": "^1.15.4"
   },

@@ -4,6 +4,7 @@ const config: JestConfigWithTsJest = {
   preset: 'ts-jest',
   testEnvironment: 'node',
   clearMocks: true,
+  setupFiles: ['<rootDir>/__tests__/test-env.ts'],
   roots: ['<rootDir>/src', '<rootDir>/__tests__'],
   setupFilesAfterEnv: ['<rootDir>/__tests__/singleton.ts'],
   testMatch: [
