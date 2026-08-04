@@ -1,92 +1,57 @@
-# OKKAZ Backend
+# OKKAZ
 
-> Marketplace de location de biens au Bénin — API REST (Node.js 20 · Express 4 · PostgreSQL 16 · Prisma 5)
+Monorepo de la plateforme OKKAZ :
 
-## Prérequis
+- `web/` : frontend Next.js 16
+- `backend/` : API Express, Prisma et PostgreSQL, intégrée depuis la branche `dev` de `5core-team/okkaz_backend`
 
-| Outil | Version min |
-|-------|-------------|
-| Node.js | 20 LTS |
-| npm | 10+ |
-| PostgreSQL | 16 |
+## Développement local
 
-## Installation
+Prérequis : Node.js 20+, npm 10+ et Docker.
 
 ```bash
-npm install
-cp .env.example .env
-# Remplir les variables dans .env (voir docs/setup/ENV.md)
+cp backend/.env.example backend/.env
+cp web/.env.example web/.env.local
+
+npm --prefix backend install
+npm --prefix web install
+
+docker compose -f backend/docker-compose.yml up -d
+npm --prefix backend run prisma:deploy
+npm --prefix backend run seed
 ```
 
-## Configuration (.env)
-
-Voir [`docs/setup/ENV.md`](docs/setup/ENV.md) pour la description détaillée de chaque variable.
-
-## Lancer le projet
+Lancer ensuite les deux services dans deux terminaux :
 
 ```bash
-# Appliquer les migrations et générer le client Prisma
-npx prisma migrate dev
-
-# Peupler les données initiales (catégories, settings, admin)
-npm run seed
-
-# Démarrer le serveur en mode développement (hot-reload)
-npm run dev
+npm run dev:backend
+npm run dev:web -- -p 3002
 ```
 
-Le serveur écoute sur `http://localhost:3000` (ou le PORT configuré).  
-Health check : `GET /api/v1/health`
+- API : `http://localhost:3000/api/v1`
+- Documentation API : `http://localhost:3000/api/v1/docs`
+- Frontend : `http://localhost:3002`
 
-## Lancer les tests
+## Vérification
 
 ```bash
-npm test            # Tous les tests
-npm run test:watch  # Mode watch
-npm run test:coverage
+npm run typecheck
+npm run lint
+npm run build
 ```
 
-## Structure du projet
+## Déploiement
 
+Le frontend et l'API doivent être déployés comme deux services depuis le même dépôt :
+
+- frontend : dossier racine `web`, commande `npm run build`
+- backend : dossier racine `backend`, image `backend/Dockerfile`
+- base de données : PostgreSQL 16 managé
+
+Configurer `NEXT_PUBLIC_API_URL=https://api.<domaine>/api/v1` côté frontend et `FRONTEND_URL=https://<domaine>` côté backend. Les secrets réels doivent rester dans les variables de l'hébergeur et ne jamais être commités.
+
+## Mettre à jour le backend amont
+
+```bash
+git subtree pull --prefix=backend git@github.com:5core-team/okkaz_backend.git dev --squash
 ```
-src/
-├── app.ts                    # Factory Express (middlewares + routes)
-├── server.ts                 # Démarrage + arrêt propre
-├── config/                   # env, prisma, logger
-├── middlewares/              # authenticate, authorize, validate…
-├── modules/                  # Un dossier par domaine métier
-│   ├── auth/
-│   ├── users/
-│   ├── kyc/
-│   ├── categories/
-│   ├── listings/
-│   ├── payments/
-│   ├── subscriptions/
-│   ├── reports/
-│   ├── reviews/
-│   ├── demands/
-│   └── admin/
-├── services/                 # email, storage, settings (partagés)
-├── types/                    # Augmentations TypeScript
-└── utils/                    # AppError, apiResponse, jwt, crypto…
-prisma/
-├── schema.prisma             # Schéma (12 tables + enums)
-└── seed.ts                   # Données initiales
-docs/                         # Documentation complète
-```
-
-## Documentation API
-
-Spécification OpenAPI : [`docs/api/openapi.yaml`](docs/api/openapi.yaml)  
-Swagger UI disponible à `/api/v1/docs` (quand le serveur tourne).
-
-## Base de données
-
-- ORM : Prisma 5  
-- SGBD : PostgreSQL 16  
-- Schéma : [`docs/database/SCHEMA.md`](docs/database/SCHEMA.md)  
-- Décisions : [`docs/DECISIONS.md`](docs/DECISIONS.md)
-
-## Contributeurs
-
-KOUTON Spynel en Avril 2026

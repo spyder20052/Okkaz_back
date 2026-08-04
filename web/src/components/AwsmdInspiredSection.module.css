@@ -1,0 +1,348 @@
+.shell {
+  background: #ffffff;
+  padding: clamp(1rem, 4vw, 4rem) 0;
+}
+
+.panel {
+  min-height: 86vh;
+  background: #ffffff;
+  border-radius: 0;
+  padding: clamp(1rem, 3vw, 3rem) 4vw;
+  overflow: hidden;
+}
+
+.headingRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 2rem;
+  padding-top: clamp(1rem, 2vw, 2rem);
+  margin-bottom: clamp(2rem, 4vw, 3.5rem);
+}
+
+.eyebrow {
+  margin: 0 0 1rem;
+  color: var(--accent);
+  font-family: var(--font-interface);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.title {
+  margin: 0;
+  max-width: 900px;
+  color: #090b0d;
+  font-family: var(--font-interface);
+  font-size: clamp(2.4rem, 5vw, 5rem);
+  font-weight: 720;
+  letter-spacing: -0.045em;
+  line-height: 1;
+}
+
+.staticTitleText {
+  display: block;
+}
+
+.movingTitleLine {
+  display: block;
+  overflow: hidden;
+  padding-bottom: 0.08em;
+}
+
+.movingTitleText {
+  display: inline-block;
+  will-change: transform, opacity;
+}
+
+.seeMoreLink {
+  align-self: flex-end;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: #0a0d0f;
+  color: #ffffff;
+  font-family: var(--font-interface);
+  font-size: 0.88rem;
+  font-weight: 750;
+  text-decoration: none;
+  padding: 0.75rem 1.6rem;
+  border-radius: 999px;
+  margin-bottom: 0.45rem;
+  box-shadow: 0 8px 20px rgba(10, 13, 15, 0.12);
+  transition: transform 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.seeMoreLink:hover {
+  background: var(--accent);
+  box-shadow: 0 10px 24px rgba(59, 130, 246, 0.24);
+  transform: translateY(-1.5px);
+}
+
+.cards {
+  display: flex;
+  gap: clamp(0.8rem, 1.7vw, 1.4rem);
+  width: 100%;
+  max-width: none;
+  overflow-x: auto;
+  scroll-behavior: smooth;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+}
+
+.cards::-webkit-scrollbar {
+  display: none;
+}
+
+.card {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: clamp(380px, 40vw, 490px);
+  border-radius: 22px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  scroll-snap-align: start;
+  color: inherit;
+  text-decoration: none;
+  backface-visibility: hidden;
+  transform: translateZ(0);
+  will-change: transform, opacity;
+  transition: transform 0.24s ease, box-shadow 0.24s ease;
+}
+
+.card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 42px rgba(20, 18, 34, 0.1);
+}
+
+.lime {
+  background: #111111;
+  color: var(--white);
+}
+
+.soft {
+  background: var(--white);
+  box-shadow: inset 0 0 0 1px rgba(17, 17, 17, 0.08);
+}
+
+.mint {
+  background: #111111;
+  color: var(--white);
+}
+
+.blue {
+  background: var(--white);
+  box-shadow: inset 0 0 0 1px rgba(17, 17, 17, 0.08);
+}
+
+.lime h3,
+.lime .seller,
+.lime .meta,
+.lime .price,
+.mint h3,
+.mint .seller,
+.mint .meta,
+.mint .price {
+  color: var(--white);
+}
+
+.lime .seller,
+.lime .meta,
+.mint .seller,
+.mint .meta {
+  opacity: 0.76;
+}
+
+.cardBody {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: clamp(0.7rem, 1vw, 0.85rem);
+  flex: 1;
+}
+
+.cardTop {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.cardTop span {
+  padding: 0.24rem 0.48rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: inherit;
+  font-size: 0.58rem;
+  font-weight: 820;
+  text-transform: uppercase;
+}
+
+.soft .cardTop span,
+.blue .cardTop span {
+  background: rgba(17, 17, 17, 0.06);
+  color: #0a0d0f;
+}
+
+.soft .cardTop span:nth-child(2),
+.blue .cardTop span:nth-child(2) {
+  background: var(--accent);
+  color: var(--white);
+}
+
+.lime .cardTop span:nth-child(2),
+.mint .cardTop span:nth-child(2) {
+  background: var(--accent);
+  color: var(--white);
+}
+
+.card h3 {
+  margin: 0.1rem 0 0;
+  color: inherit;
+  font-size: clamp(0.85rem, 1.15vw, 1.1rem);
+  font-weight: 760;
+  letter-spacing: -0.035em;
+  line-height: 1.1;
+}
+
+.seller,
+.meta {
+  margin: 0;
+  color: rgba(9, 11, 13, 0.66);
+  font-size: 0.74rem;
+  font-weight: 560;
+  line-height: 1.35;
+}
+
+.seller {
+  margin-top: 0.15rem;
+  font-weight: 760;
+  color: rgba(9, 11, 13, 0.78);
+}
+
+.meta {
+  margin-bottom: 0.2rem;
+}
+
+.price {
+  display: block;
+  margin-top: auto;
+  color: inherit;
+  font-size: 0.8rem;
+  font-weight: 860;
+  letter-spacing: -0.025em;
+}
+
+.imageWrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
+  transform: translateZ(0);
+  background: #f3f4f6;
+  border-radius: 22px 22px 0 0;
+}
+
+.imageWrap :global(img) {
+  object-fit: cover;
+}
+
+.readMore {
+  display: none;
+}
+
+@media (max-width: 1100px) {
+  .cards {
+    width: 100%;
+    max-width: none;
+  }
+
+  .card {
+    flex: 0 0 min(52vw, 380px);
+    min-width: 300px;
+  }
+}
+
+@media (max-width: 720px) {
+  .shell {
+    padding: 0;
+  }
+
+  .panel {
+    border-radius: 0;
+    min-height: auto;
+    padding: 12vw 5vw;
+  }
+
+  .headingRow {
+    display: grid;
+    align-items: flex-start;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .eyebrow {
+    margin-bottom: 0.65rem;
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+  }
+
+  .title {
+    max-width: 100%;
+    font-size: clamp(2rem, 10vw, 3.05rem);
+    line-height: 1;
+    letter-spacing: 0;
+  }
+
+  .movingTitleLine {
+    overflow: visible;
+    padding-bottom: 0;
+  }
+
+  .seeMoreLink {
+    justify-self: start;
+    margin-top: 0.25rem;
+    margin-bottom: 0;
+    padding: 0.65rem 1.35rem;
+    font-size: 0.82rem;
+  }
+
+  .cards {
+    gap: 0.8rem;
+    padding-right: 1.25rem;
+  }
+
+  .card {
+    flex-basis: min(78vw, 330px);
+    min-width: min(78vw, 330px);
+    min-height: 430px;
+    padding: 1rem;
+  }
+
+  .cardTop {
+    grid-template-columns: max-content max-content 1fr;
+    gap: 0.3rem;
+    margin-bottom: 1rem;
+  }
+
+  .cardTop span {
+    max-width: 100%;
+    padding: 0.42rem 0.52rem;
+    font-size: 0.58rem;
+    line-height: 1;
+    white-space: nowrap;
+  }
+
+  .card h3 {
+    font-size: clamp(1.55rem, 9vw, 2.2rem);
+    line-height: 0.96;
+    letter-spacing: 0;
+  }
+
+  .seller,
+  .meta {
+    font-size: 0.74rem;
+  }
+}

@@ -1,0 +1,69 @@
+.occasionBox h3 {
+  font-size: 2.8rem;
+  font-weight: 900;
+  line-height: 1;
+  color: #171717;
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: -0.02em;
+}
+
+.occAvatars {
+  display: flex;
+  align-items: center;
+}
+
+.occAvatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: #eee;
+  border: 4px solid white;
+  box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+}
+
+.occAvatar:nth-child(2) {
+  margin-left: -20px;
+  background: #ddd;
+}
+
+.propertyTypeLabel {
+  margin-top: 2rem;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #171717;
+  opacity: 0.5;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+@media (max-width: 1024px) {
+  .propertySection {
+    padding: 1rem;
+  }
+  .propertyContainer {
+    height: auto;
+    min-height: 90vh;
+    border-radius: 40px;
+  }
+  .propertyNavWrapper {
+    flex-direction: column;
+    padding: 2rem;
+    gap: 1.5rem;
+    position: relative;
+  }
+  .propertyMainContent {
+    position: relative;
+    padding: 2rem;
+  }
+  .propertyMainTitle {
+    font-size: 4.5rem;
+  }
+  .propertyBottomLeftArea {
+    position: relative;
+    min-width: 0;
+    width: 100%;
+    border-radius: 0;
+    padding: 3rem 2rem;
+  }
+}

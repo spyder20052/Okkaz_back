@@ -1,0 +1,32 @@
+.missionText {
+  font-size: clamp(2.6rem, 5.4vw, 5.6rem);
+  font-family: var(--font-interface);
+  font-weight: 720;
+  color: #111418;
+  line-height: 0.98;
+  letter-spacing: -0.045em;
+  max-width: 82%;
+  margin: 0;
+}
+
+.staticText {
+  display: block;
+}
+
+.movingLine {
+  display: block;
+  overflow: hidden;
+  padding-bottom: 0.08em;
+}
+
+.movingText {
+  display: inline-block;
+  will-change: transform;
+}
+
+@media (max-width: 768px) {
+  .missionText {
+    font-size: clamp(2rem, 8vw, 3rem);
+    max-width: 100%;
+  }
+}

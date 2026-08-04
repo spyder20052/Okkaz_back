@@ -1,0 +1,332 @@
+.footer {
+  background: #111111;
+  color: white;
+  display: flex;
+  flex-direction: column;
+  font-family: var(--font-interface);
+  overflow: hidden;
+}
+
+.mainContainer {
+  padding: 6vw 4vw 0vw 4vw;
+  display: flex;
+  flex-direction: column;
+  gap: 4rem;
+}
+
+.topRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 2rem;
+}
+
+.emailSection {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.decorator {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.decoratorLine {
+  width: 32px;
+  height: 8px;
+  background: linear-gradient(90deg, #3B82F6 50%, white 50%);
+  border-radius: 4px;
+}
+
+.emailDesc {
+  font-size: 0.88rem;
+  font-weight: 560;
+  color: #ccc;
+  line-height: 1.5;
+  letter-spacing: -0.01em;
+  max-width: 280px;
+}
+
+.emailTitleContainer {
+  display: inline-block;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid rgba(255,255,255,0.2);
+}
+
+.emailTitle {
+  font-size: clamp(2rem, 5vw, 4rem);
+  font-weight: 760;
+  margin: 0;
+  letter-spacing: -0.045em;
+  font-family: var(--font-interface);
+  word-break: break-all;
+}
+
+.ctaBox {
+  background: #F97316;
+  color: #111;
+  padding: 2rem;
+  border-radius: 24px;
+  width: clamp(250px, 30vw, 300px);
+  display: flex;
+  flex-direction: column;
+  gap: 3rem;
+  text-decoration: none;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.ctaBox:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 18px 38px rgba(249, 115, 22, 0.18);
+}
+
+.ctaTitle {
+  font-size: 2rem;
+  font-weight: 760;
+  margin: 0;
+  font-family: var(--font-interface);
+  letter-spacing: -0.045em;
+}
+
+.ctaButton {
+  background: #111;
+  color: white;
+  padding: 0.8rem 1.5rem;
+  border-radius: 99px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.ctaButton:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+
+.ctaButtonText {
+  font-weight: 800;
+  font-size: 0.76rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.middleRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 2rem;
+}
+
+.links {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(150px, 1fr));
+  gap: 0.65rem 2rem;
+  max-width: 520px;
+}
+
+.linksTitle {
+  grid-column: 1 / -1;
+  margin: 0 0 0.45rem;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.linkItem {
+  color: white;
+  text-decoration: none;
+  font-size: clamp(1rem, 1.4vw, 1.35rem);
+  font-weight: 680;
+  font-family: var(--font-interface);
+  letter-spacing: -0.025em;
+  transition: color 0.3s ease;
+}
+
+.linkItem:hover {
+  color: #F97316;
+}
+
+.address {
+  text-align: right;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-left: auto;
+}
+
+.addressTitle {
+  font-size: 0.78rem;
+  font-weight: 800;
+  margin: 0;
+  font-family: var(--font-interface);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.addressText {
+  color: #ccc;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  font-weight: 520;
+  max-width: 200px;
+}
+
+.hugeTextContainer {
+  text-align: center;
+  width: 100%;
+  margin-top: auto;
+}
+
+.hugeText {
+  font-size: clamp(8rem, 21vw, 22vw);
+  font-weight: 600;
+  margin: 0;
+  line-height: 0.75;
+  letter-spacing: -0.05em;
+  font-family: var(--font-brand);
+  display: flex;
+  justify-content: center;
+}
+
+.letterWrapper {
+  display: inline-block;
+  overflow: hidden;
+  vertical-align: bottom;
+  padding: 0.2em 0.1em;
+  margin: -0.2em -0.1em;
+}
+
+.animatedLetter {
+  display: inline-block;
+  transform: translateY(110%);
+  opacity: 0;
+  transition: transform 1s cubic-bezier(0.16, 1, 0.3, 1), opacity 1s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.inView .animatedLetter {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+.bottomBar {
+  background: #3B82F6;
+  color: white;
+  padding: 1.5rem 4vw;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.bottomBarLocation {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.bottomBarLinks {
+  display: flex;
+  gap: 2rem;
+}
+
+.bottomBarLink {
+  color: white;
+  text-decoration: none;
+  transition: opacity 0.3s ease;
+}
+
+.bottomBarLink:hover {
+  opacity: 0.8;
+}
+
+/* ─── FOOTER RESPONSIVE ────────────────────────────────────── */
+
+/* Tablette portrait & paysage */
+@media (max-width: 1024px) {
+  .mainContainer {
+    padding: 8vw 6vw 0vw 6vw;
+    gap: 3rem;
+  }
+  
+  .emailTitle {
+    font-size: clamp(2.5rem, 6vw, 3rem);
+  }
+
+  .hugeText {
+    font-size: clamp(6rem, 24vw, 24vw);
+  }
+}
+
+/* Mobile large (phablet) */
+@media (max-width: 768px) {
+  .mainContainer {
+    padding: 10vw 6vw 0vw 6vw;
+  }
+
+  .topRow, .middleRow {
+    flex-direction: column;
+    gap: 3rem;
+  }
+
+  .ctaBox {
+    width: 100%;
+    max-width: none;
+  }
+
+  .address {
+    text-align: left;
+    margin-left: 0;
+  }
+
+  .hugeTextContainer {
+    margin-top: 4rem;
+  }
+
+  .bottomBar {
+    flex-direction: column;
+    text-align: center;
+    gap: 1.5rem;
+    padding: 2rem 6vw;
+  }
+
+  .bottomBarLinks {
+    justify-content: center;
+  }
+}
+
+/* Mobile S */
+@media (max-width: 480px) {
+  .mainContainer {
+    padding: 12vw 6vw 0vw 6vw;
+  }
+
+  .emailTitle {
+    font-size: clamp(1.8rem, 8vw, 2.5rem);
+  }
+
+  .links {
+    grid-template-columns: 1fr;
+  }
+
+  .linkItem, .addressTitle {
+    font-size: 1.3rem;
+  }
+
+  .ctaTitle {
+    font-size: 1.5rem;
+  }
+}

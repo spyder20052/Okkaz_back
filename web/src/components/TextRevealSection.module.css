@@ -1,0 +1,141 @@
+.section {
+  position: relative;
+  width: 100%;
+  background-color: #ffffff;
+  padding: 2vw 4vw 10vw 4vw;
+  overflow: hidden;
+}
+
+.inner {
+  position: relative;
+  max-width: 1600px;
+  margin: 0 auto;
+}
+
+/* Scrubber line that sweeps across */
+.scrubber {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 3px;
+  height: 100%;
+  background-color: #1a1a1a;
+  transform-origin: top;
+  will-change: transform;
+}
+
+/* Text reveal wrapper */
+.textWrapper {
+  position: relative;
+  display: inline-block;
+}
+
+/* The gray (unlit) text underneath */
+.textBase {
+  font-family: var(--font-interface);
+  font-size: clamp(3.2rem, 8.5vw, 9rem);
+  font-weight: 760;
+  color: #e0e0e0;
+  line-height: 0.92;
+  letter-spacing: -0.06em;
+  margin: 0;
+  user-select: none;
+}
+
+/* The dark (revealed) text overlay with a mask */
+.textReveal {
+  position: absolute;
+  inset: 0;
+  font-family: var(--font-interface);
+  font-size: clamp(3.2rem, 8.5vw, 9rem);
+  font-weight: 760;
+  color: #1a1a1a;
+  line-height: 0.92;
+  letter-spacing: -0.06em;
+  margin: 0;
+  /* The mask starts at full width and shrinks to 0 from the right */
+  clip-path: inset(0 100% 0 0);
+  will-change: clip-path;
+}
+
+/* CTA that appears after the reveal */
+.cta {
+  margin-top: 4rem;
+  opacity: 0;
+  transform: translateY(20px);
+  will-change: opacity, transform;
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+}
+
+.ctaText {
+  font-family: var(--font-interface);
+  font-size: clamp(0.98rem, 1.4vw, 1.2rem);
+  font-weight: 560;
+  color: var(--accent);
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+.ctaActions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.ctaButton {
+  min-height: 53px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1.15rem;
+  background-color: #1a1a1a;
+  color: white;
+  padding: 0.65rem 1.55rem;
+  border-radius: 100px;
+  font-family: var(--font-interface);
+  font-size: 0.7rem;
+  font-weight: 720;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  text-decoration: none;
+  transition: background-color 0.2s ease;
+  white-space: nowrap;
+  border: none;
+  cursor: pointer;
+}
+
+.ctaButton:hover {
+  background-color: #333;
+}
+
+.ctaButtonSecondary {
+  background-color: transparent;
+  color: #1a1a1a;
+  box-shadow: inset 0 0 0 1px rgba(26, 26, 26, 0.22);
+}
+
+.ctaButtonSecondary:hover {
+  background-color: #f1f3f5;
+}
+
+@media (max-width: 768px) {
+  .section {
+    padding: 16vw 6vw;
+  }
+  .cta {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .ctaActions {
+    width: 100%;
+  }
+
+  .ctaButton {
+    justify-content: center;
+    flex: 1 1 180px;
+  }
+}

@@ -1,0 +1,120 @@
+.section {
+  position: relative;
+  overflow: hidden;
+  background: #ffffff;
+  padding: clamp(4rem, 8vw, 7rem) 4vw clamp(3rem, 6vw, 5rem);
+}
+
+.inner {
+  width: min(100%, 1600px);
+  margin: 0 auto;
+}
+
+.copy {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 2rem;
+  margin-bottom: clamp(2rem, 5vw, 4rem);
+}
+
+.eyebrow {
+  color: var(--accent);
+  font-family: var(--font-interface);
+  font-size: 0.78rem;
+  font-weight: 820;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.title {
+  max-width: 760px;
+  margin: 0;
+  color: #101418;
+  font-family: var(--font-interface);
+  font-size: clamp(2.3rem, 5vw, 5rem);
+  font-weight: 740;
+  letter-spacing: -0.05em;
+  line-height: 0.95;
+  text-align: right;
+}
+
+.staticTitleText {
+  display: block;
+}
+
+.movingTitleLine {
+  display: block;
+  overflow: visible;
+  padding-bottom: 0.16em;
+}
+
+.movingTitleText {
+  display: inline-block;
+  will-change: transform;
+}
+
+.motionPath {
+  display: block;
+  width: 100%;
+  height: clamp(180px, 22vw, 320px);
+  overflow: visible;
+}
+
+.path {
+  stroke: rgba(12, 16, 22, 0.26);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-dasharray: 10 12;
+}
+
+.marker {
+  visibility: hidden;
+}
+
+.markerBody {
+  fill: #111418;
+}
+
+.markerWindow {
+  fill: var(--accent);
+}
+
+.markerLine {
+  fill: none;
+  stroke: #111418;
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+
+@media (max-width: 768px) {
+  .section {
+    padding: 3rem 1.25rem;
+  }
+
+  .copy {
+    display: block;
+  }
+
+  .title {
+    margin-top: 1rem;
+    text-align: left;
+    line-height: 1.02;
+    letter-spacing: 0;
+  }
+
+  .movingTitleLine {
+    overflow: visible;
+    padding-bottom: 0.22em;
+  }
+
+  .movingTitleText {
+    transform: none !important;
+  }
+
+  .motionPath {
+    height: 190px;
+    transform: scale(1.18);
+    transform-origin: left center;
+  }
+}

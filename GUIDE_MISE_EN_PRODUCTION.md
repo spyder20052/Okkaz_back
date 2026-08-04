@@ -2,6 +2,7 @@
 
 Chaque section est autonome : la config à faire, où la faire, et comment vérifier qu'elle marche. Ordre recommandé = ordre du document. Les sections 1 à 5 se font **avant** le déploiement ; 6 à 10 **pendant** ; 11 à 13 **après**.
 
+> Monorepo `integration/fullstack` : les chemins ci-dessous sont relatifs à la racine (`backend/`, `web/`). Ce guide complète la checklist `RESTANT_A_FAIRE.md` (même repo) : elle liste QUOI faire, ce guide détaille COMMENT.
 > Rappel des environnements : le `.env` de dev reste sur votre machine. Les valeurs de prod vont dans le `.env` **du serveur** (jamais dans git).
 
 ---
@@ -64,7 +65,7 @@ Deux options :
 
 **Option A — disque local (recommandée pour le lancement)** : `STORAGE_DRIVER=local`, rien à coder. Contraintes : un seul serveur, et le dossier `uploads/` doit être un **volume persistant** inclus dans les sauvegardes (§11). C'est le choix simple et suffisant pour un MVP mono-serveur.
 
-**Option B — S3/Cloudinary** : nécessaire si multi-serveurs ou PaaS à disque éphémère (Railway, Render…). ⚠️ **Les drivers ne sont pas implémentés** (`storage.service.ts` lève une erreur) — c'est ~1 journée de dev + tests à prévoir AVANT de choisir un hébergeur sans disque persistant.
+**Option B — Cloudinary (choix retenu dans RESTANT_A_FAIRE.md)** : nécessaire si multi-serveurs ou PaaS à disque éphémère (Railway, Render…). ⚠️ **Le driver n'est pas implémenté** (`backend/src/services/storage.service.ts` lève une erreur) — il faut installer le SDK `cloudinary`, implémenter le driver (photos publiques + **URLs privées signées pour les pièces KYC**) et tester : ~1 journée de dev à faire AVANT le déploiement si cette option est retenue.
 
 ➡️ Si vous prenez un VPS (option A), aucun blocage. Si vous visez un PaaS, dites-le-moi et j'implémente le driver S3 d'abord.
 
@@ -115,7 +116,7 @@ Le front Next : `npm ci && npm run build && npm run start -- -p 3002` (ou déplo
 ## 8. Premier déploiement (ordre exact)
 
 ```bash
-# Sur le serveur, dans le dossier du backend
+# Sur le serveur, dans backend/ du monorepo
 cp .env.example .env            # remplir avec TOUTES les valeurs des §1-6
 docker compose up -d            # Postgres
 npm ci

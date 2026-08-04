@@ -67,20 +67,18 @@ Le frontend livré était **100 % statique** : aucune requête réseau, aucune a
 ## 2. Lancer l'ensemble en local
 
 ```bash
-# 1. Backend (repo 5core-team/okkaz_backend, branche dev)
-cd okkaz_backend
-cp .env.example .env          # remplir JWT_SECRET, JWT_REFRESH_SECRET (openssl rand -hex 64),
-                              # ENCRYPTION_KEY (openssl rand -base64 32) et les clés KKiaPay sandbox
-docker compose up -d          # démarre PostgreSQL 16 (port 5432)
-npm install
-npx prisma migrate deploy     # applique le schéma
-npm run seed                  # catégories + settings + compte admin
-npm run seed:demo             # comptes vendeur/acheteur + 4 annonces actives (relançable)
-npm run dev                   # API sur http://localhost:3000 (Swagger: /api/v1/docs)
+# 1. PostgreSQL (docker)
+docker start okkaz-postgres   # créé via: docker run -d --name okkaz-postgres \
+                              #   -e POSTGRES_USER=okkaz -e POSTGRES_PASSWORD=okkaz \
+                              #   -e POSTGRES_DB=okkaz_dev -p 5432:5432 postgres:16-alpine
 
-# 2. Frontend (port 3002 — le 3000 est pris par l'API)
+# 2. Backend (port 3000)
+cd okkaz_backend
+npm install && npx prisma migrate deploy && npm run seed
+npm run dev
+
+# 3. Frontend (port 3002 — le 3000 est pris par l'API)
 cd <repo-front>/web
-cp .env.example .env.local    # renseigner la clé publique KKiaPay
 npm install
 npm run dev -- -p 3002        # ou: npx next build && npx next start -p 3002
 ```
@@ -91,16 +89,14 @@ NEXT_PUBLIC_API_URL=http://localhost:3000/api/v1
 NEXT_PUBLIC_KKIAPAY_PUBLIC_KEY=<clé publique sandbox>
 NEXT_PUBLIC_KKIAPAY_SANDBOX=true
 ```
-Côté backend, `FRONTEND_URL` accepte **plusieurs origines séparées par des virgules** (ex. `http://localhost:3002,http://localhost:5173`) — ajoutez l'origine de votre serveur Next si vous utilisez un autre port.
+Côté backend, `.env` : `FRONTEND_URL=http://localhost:3002` (CORS).
 
-**Comptes de test** (créés par `npm run seed` + `npm run seed:demo`) :
+**Comptes de test** (base seedée) :
 | Compte | Rôle | Identifiants |
 |---|---|---|
 | Admin | ADMIN | `admin@okkaz.bj` / `Admin@OKKAZ2026` |
-| Vendeur (KYC approuvé, 4 annonces actives) | SELLER | `seller.demo@okkaz.bj` / `Seller@2026` |
-| Acheteur | BUYER | `buyer.demo@okkaz.bj` / `Buyer@2026` |
-
-Pour tester les parcours au fur et à mesure : se connecter en acheteur pour consulter contacts/avis, en vendeur pour publier (les annonces partent en PENDING), puis en admin (`/admin/annonces`) pour les valider. Swagger complet sur `http://localhost:3000/api/v1/docs`.
+| Vendeur (KYC approuvé, 3 annonces actives) | SELLER | `seller.demo@okkaz.bj` / `Seller@2026` |
+| Acheteur | BUYER | `buyer.test@okkaz.bj` / `Password1` |
 
 ⚠️ Rate limit : 10 requêtes / 15 min / IP sur `/auth/*` (login, register, forgot-password).
 
@@ -110,8 +106,8 @@ Pour tester les parcours au fur et à mesure : se connecter en acheteur pour con
 
 ### A. Divergences produit MAJEURES (à trancher ensemble)
 
-**1. ~~« Je recherche » réservé au rôle BUYER~~ — ✅ RÉSOLU (18 juil. 2026).**
-`POST /listings/:id/contact` et `POST /demands/initiate` (+ `GET /demands/me`, `PATCH /demands/:id/close`) sont désormais ouverts aux rôles SELLER/SELLER_PRO : un vendeur peut agir comme consommateur, conformément au cahier des charges (« création de compte obligatoire pour toute action »). Cas particulier géré : le propriétaire qui consulte le contact de **sa propre annonce** reçoit son vrai numéro déchiffré, sans traçage de consultation (ne fausse pas les stats, n'ouvre pas le droit à un avis).
+**1. « Je recherche » est réservé au rôle BUYER, mais la page est dans l'espace vendeur.**
+`POST /demands/initiate` renvoie actuellement 403 pour un SELLER. **Décision produit prise : un vendeur reste également acheteur avec le même compte.** Le backend réel doit donc ouvrir `POST /demands/initiate`, `GET /demands/me`, `PATCH /demands/:id/close`, `POST /listings/:id/contact` et `GET /users/me/contact-reveals` aux rôles `SELLER` et `SELLER_PRO`. Le front et `mock/server.mjs` appliquent déjà cette règle.
 
 **2. L'option « Numéro direct +2 500 FCFA » par annonce n'existe pas.**
 Dans le backend, la consultation du contact est **gratuite** : l'acheteur connecté clique « voir le contact », et reçoit le **vrai numéro du vendeur uniquement si celui-ci a un abonnement Premium actif** ; sinon le numéro de mise en relation de la plateforme (WCC). Le toggle payant du wizard de publication et le flux `?type=direct_number` de la page paiement ont été neutralisés. *Le front doit abandonner ce concept ou le back doit créer ce produit payant.*
@@ -122,8 +118,8 @@ Seul l'abonnement Premium (`isFeatured=true` sur **toutes** les annonces du vend
 **4. Aucune réservation / paiement de location.**
 Le flux par défaut de `/paiement` (payer une location avec caution, dates, etc.) n'a **aucun** équivalent backend : pas de modèle Booking, pas de calendrier, pas de paiement de location. L'UI affiche « non disponible ». *Gros morceau produit à cadrer si nécessaire (cahier des charges le mentionne).*
 
-**5. ~~Pas d'OAuth Google/Apple~~ — ✅ Google RÉSOLU (19 juil. 2026), Apple en attente.**
-`POST /auth/oauth/google` est implémenté : le front envoie l'ID token Google Identity Services, le backend le vérifie (audience + signature via l'endpoint officiel Google), crée un compte BUYER actif au premier login (sans téléphone ni mot de passe — schéma migré) ou lie le compte Google à un compte existant portant le même email. Il reste à créer un **Client ID OAuth** sur console.cloud.google.com et à le renseigner dans `GOOGLE_CLIENT_ID` (backend) + `NEXT_PUBLIC_GOOGLE_CLIENT_ID` (front) — sans quoi le bouton front passe en mode simulation et le serveur répond 503 `OAUTH_NOT_CONFIGURED`. **Sign in with Apple reste non implémenté** : il exige un compte Apple Developer payant (99 $/an, Services ID + clé privée) — décision à prendre avant tout développement.
+**5. Pas d'OAuth Google/Apple.**
+La page connexion du front n'avait QUE deux boutons factices « Sign in with Google/Apple ». Le backend fait de l'auth email/téléphone + mot de passe (JWT). La page a été refondue en vrais formulaires. *Si l'OAuth est souhaité, c'est un chantier backend (Passport/OIDC).*
 
 ### B. Fonctionnalités front sans aucun backend (UI présente, API absente)
 
@@ -151,7 +147,7 @@ Le flux par défaut de `/paiement` (payer une location avec caution, dates, etc.
 | 20 | `GET /auth/verify-email/:token` | Page de confirmation d'email (le lien du mail pointe actuellement vers l'API brute) |
 | 21 | `GET /demands`, `GET /demands/standard`, `GET /demands/:id`, `PATCH /demands/:id/close` | **Liste des demandes « Je recherche » pour que les vendeurs y répondent** (les EXPRESS sont réservées aux SELLER_PRO) — c'est le cœur du produit demandes, aucune page ne l'affiche |
 | 22 | `GET /users/:id/public` | Page profil public d'un vendeur (note moyenne, annonces actives) |
-| 23 | `GET /users/me/contact-reveals` (ouvert à BUYER/SELLER/SELLER_PRO depuis le 19 juil.), `GET /users/me/payments` | Espace acheteur : historique des contacts consultés et des paiements |
+| 23 | `GET /users/me/contact-reveals`, `GET /users/me/payments` | Espace acheteur : historique des contacts consultés et des paiements |
 | 24 | `PATCH /reviews/:id/moderate`, `DELETE /reviews/:id` | UI admin de modération des avis (note visible ajoutée sur /admin/moderation) |
 | 25 | Filtres API non exposés : `city`, `minPrice`/`maxPrice` sur /listings ; `method`, `dateFrom/dateTo` sur /admin/payments ; `kycStatus` sur /admin/users | Ajouter les contrôles UI correspondants (facile) |
 
@@ -177,7 +173,7 @@ Autres détails :
 | 30 | **Rate limiting** | 200 req/15 min global, 10 req/15 min sur l'auth (valeurs codées en dur, les vars `RATE_LIMIT_*` du .env ne sont pas câblées) |
 | 31 | **Refresh token** | Expire à 7 jours dans le code (le `.env` annonce 30 j — non câblé). Transmis en body JSON, pas en cookie |
 | 32 | **Incohérence API mineure** | La liste `GET /listings` expose `contactPhoneWcc`, le détail expose `contactPhoneDisplayed` — à unifier côté back |
-| 33 | ~~Mode édition d'annonce~~ ✅ RÉSOLU | Le propriétaire qui appelle `POST /listings/:id/contact` sur sa propre annonce reçoit désormais son vrai numéro déchiffré (18 juil. 2026) |
+| 33 | **Mode édition d'annonce** | Le back ne renvoie jamais le vrai `contactPhone` au propriétaire → le formulaire d'édition préremplit avec le téléphone du compte. Suggestion back : renvoyer le numéro déchiffré quand `userId === owner` |
 | 34 | **Catégories inactives** | `DELETE /categories/:id` est un soft-delete mais `GET /categories` ne renvoie que les actives → une catégorie désactivée devient invisible et irrécupérable depuis l'UI. Suggestion back : `GET /admin/categories?includeInactive=true` |
 | 35 | **Guards front = client-side** | La protection de /admin et /vendeur est en JavaScript client (pas de middleware serveur). Suffisant car l'API vérifie les rôles, mais un middleware Next serait plus propre |
 
@@ -185,10 +181,10 @@ Autres détails :
 
 ## 4. Récapitulatif des priorités proposées
 
-**À trancher produit (bloquant pour la cohérence)** : n°2 (numéro direct), n°3 (boost), n°4 (réservation). Le n°1 (demandes BUYER vs vendeur) est résolu : routes ouvertes aux vendeurs.
+**À trancher produit (bloquant pour la cohérence)** : n°1 (demandes BUYER vs vendeur), n°2 (numéro direct), n°3 (boost), n°4 (réservation).
 
 **Côté front (rapide, API déjà prête)** : n°19-20 (mot de passe oublié / vérif email), n°21 (liste des demandes pour vendeurs — cœur du produit), n°22-23 (profil public, espace acheteur), n°24 (modération avis), n°25 (filtres).
 
-**Côté back (avant prod)** : n°27 (stockage S3/Cloudinary), n°26 (webhook public), n°14 (GET /admin/subscriptions), n°16 (upload avatar), n°34 (catégories inactives), n°32 (nommage contactPhone).
+**Côté back (avant prod)** : n°27 (stockage S3/Cloudinary), n°26 (webhook public), n°14 (GET /admin/subscriptions), n°16 (upload avatar), n°34 (catégories inactives), n°32-33 (contactPhone).
 
 **Chantiers plus gros à planifier** : chat (n°6), notifications (n°7), favoris (n°18), journal/litiges/contrats admin (n°9-11), OAuth (n°5).

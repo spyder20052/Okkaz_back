@@ -1,0 +1,33 @@
+.propertyMainContent {
+  position: absolute;
+  inset: 0;
+  padding: 0 6rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding-bottom: 12rem;
+  z-index: 10;
+}
+
+.propertyMainTitle {
+  font-size: clamp(3rem, 6vw, 7rem);
+  font-weight: 900;
+  line-height: 0.9;
+  color: white;
+  margin: 0;
+  letter-spacing: -0.04em;
+  max-width: 1200px;
+}
+
+.propertyTitleSpan {
+  display: block;
+  margin-top: 4rem;
+  margin-left: 15rem; /* Shifted to the right */
+}
+
+.propertySubtitleSection {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  width: 100%;
+}
