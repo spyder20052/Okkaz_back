@@ -39,3 +39,8 @@ next-env.d.ts
 # Claude agent files
 .claude/
 
+
+# Artefacts locaux du backend (ne jamais versionner)
+uploads/
+.env.test
+dist/
