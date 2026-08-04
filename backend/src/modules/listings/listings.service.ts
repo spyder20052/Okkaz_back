@@ -23,7 +23,23 @@ import { parsePagination, buildPaginationMeta } from "../../utils/pagination";
 import { encrypt, decrypt, buildWatermark } from "../../utils/crypto";
 import { uniqueSlug } from "../../utils/slug";
 import { assertUserKycApproved } from "../kyc/kyc.service";
-import { getSettingNumber } from "../../services/settings.service";
+import { getSetting, getSettingNumber } from "../../services/settings.service";
+
+/**
+ * Numéro de mise en relation OKKAZ affiché à la place du numéro du vendeur
+ * (annonceur sans abonnement Premium).
+ *
+ * Priorité : réglage `wcc_phone_number` en base (modifiable via
+ * `/admin/reglages` ou Prisma Studio, effet immédiat sur toutes les
+ * annonces) → à défaut, valeur figée sur l'annonce → à défaut, `.env`.
+ *
+ * @param listingWcc - Valeur `contactPhoneWcc` stockée sur l'annonce.
+ * @returns Le numéro OKKAZ courant.
+ * @private
+ */
+async function currentWccPhone(listingWcc?: string | null): Promise<string> {
+  return (await getSetting("wcc_phone_number")) ?? listingWcc ?? env.WCC_PHONE_NUMBER;
+}
 import { uploadAsset } from "../../services/storage.service";
 
 /**
@@ -140,7 +156,7 @@ export async function createListing(
       locationCity: data.locationCity,
       locationAddress: data.locationAddress ?? null,
       contactPhone: encrypt(data.contactPhone),
-      contactPhoneWcc: env.WCC_PHONE_NUMBER,
+      contactPhoneWcc: await currentWccPhone(),
       purchasePrice:
         data.purchasePrice != null
           ? new Prisma.Decimal(data.purchasePrice)
@@ -398,7 +414,7 @@ export async function getDetail(listingId: string) {
   // `revealContact` (POST /:id/contact).
   return {
     ...stripPrivateFields(listing),
-    contactPhoneDisplayed: listing.contactPhoneWcc,
+    contactPhoneDisplayed: await currentWccPhone(listing.contactPhoneWcc),
   };
 }
 
@@ -449,7 +465,7 @@ export async function revealContact(userId: string, listingId: string) {
   const isOwnerNumber = Boolean(activeSubscription);
   const contactPhone = isOwnerNumber
     ? decrypt(listing.contactPhone)
-    : listing.contactPhoneWcc;
+    : await currentWccPhone(listing.contactPhoneWcc);
 
   // Enregistre la consultation (idempotent : une entrée par (user, listing)).
   const existing = await prisma.contactReveal.findUnique({

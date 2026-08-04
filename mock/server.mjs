@@ -131,6 +131,7 @@ addListing({ title: "Groupe électrogène 20kVA", slug: "outils-de-travail", ren
 addListing({ title: "Sono complète mariage 500 pers.", slug: "divertissement", rentalPrice: 90000, rentalPeriod: "DAY", condition: "GOOD", city: "Cotonou", description: "Pack sonorisation + éclairage pour événements jusqu'à 500 personnes, technicien inclus sur demande.", status: "PENDING", createdAt: daysAgo(1) });
 
 db.settings.push(
+  { key: "wcc_phone_number", value: "+22900000000", description: "Numéro de mise en relation OKKAZ (vendeurs sans abonnement)" },
   { key: "review_min_delay_hours", value: "24", description: "Délai minimal (heures) avant dépôt d'un avis" },
   { key: "review_reminder_delay_hours", value: "48", description: "Délai avant rappel d'avis par email" },
   { key: "max_reports_before_suspend", value: "5", description: "Signalements avant suspension auto" },

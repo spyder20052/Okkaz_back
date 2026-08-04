@@ -79,6 +79,12 @@ const CATEGORIES: Array<{
 
 const SETTINGS: Array<{ key: string; value: string; description: string }> = [
   {
+    key: "wcc_phone_number",
+    value: "+22900000000",
+    description:
+      "Numéro de mise en relation OKKAZ affiché à la place du numéro des vendeurs sans abonnement (modifiable ici ou via /admin/reglages, effet immédiat)",
+  },
+  {
     key: "review_min_delay_hours",
     value: "24",
     description:

@@ -235,7 +235,7 @@ La demande devient ACTIVE **après confirmation du paiement** (webhook).
 **Paiements** — `GET /admin/payments?type=&status=&method=&userId=&dateFrom=&dateTo=` (paginé)
 
 **Réglages** — `GET /admin/settings` → `{ settings: [{ key, value, description }] }` · `PATCH /admin/settings/:key` `{ value }`
-Clés utiles : `subscription_weekly_price`, `subscription_monthly_price`, `demand_listing_price`, `express_demand_min_price`, `express_demand_percent`, `review_min_delay_hours`, `seller_free_max_photos`, `max_reports_before_suspend`.
+Clés utiles : `wcc_phone_number` (numéro de mise en relation OKKAZ — effet immédiat sur toutes les annonces), `subscription_weekly_price`, `subscription_monthly_price`, `demand_listing_price`, `express_demand_min_price`, `express_demand_percent`, `review_min_delay_hours`, `seller_free_max_photos`, `max_reports_before_suspend`.
 
 ## 13. Divers
 
