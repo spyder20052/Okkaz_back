@@ -44,3 +44,11 @@ next-env.d.ts
 uploads/
 .env.test
 dist/
+
+# Réglages Claude Code personnels (permissions locales)
+.claude/settings.local.json
+
+# Artefacts d'outils locaux (identifiants Neon, agents, skills)
+.neon
+.agents/
+skills-lock.json
