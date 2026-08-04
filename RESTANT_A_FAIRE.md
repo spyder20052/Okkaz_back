@@ -33,9 +33,10 @@ Ce document suit les tâches restantes après l'intégration du frontend Next.js
 
 ## Priorité 1 — Comptes et secrets externes
 
-- [x] **Décision (4 août) : fichiers stockés dans Neon** (`STORAGE_DRIVER=db`, table `stored_files`, servis par `GET /files/:id`) — aucun compte Cloudinary nécessaire.
-- [x] Stocker les photos d'annonces (publiques, cache immuable) — testé.
-- [x] Protéger les pièces KYC : accès restreint au token admin ou au propriétaire (401/403 vérifiés par tests).
+- [x] **Décision finale (4 août) : Cloudinary** (`STORAGE_DRIVER=cloudinary`) — driver implémenté : photos publiques, pièces KYC en mode `authenticated` avec URL signée.
+- [ ] Créer le compte Cloudinary de production et fournir `CLOUDINARY_URL` (guide §5).
+- [ ] Recette : upload photo + pièce KYC sur Cloudinary avec le vrai compte.
+- [x] Alternative de secours en place : `STORAGE_DRIVER=db` (fichiers dans Neon, accès KYC contrôlé, testé).
 - [ ] Fournir les clés KKiaPay sandbox :
   - `KKIAPAY_PUBLIC_KEY`
   - `KKIAPAY_PRIVATE_KEY`

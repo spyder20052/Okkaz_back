@@ -59,17 +59,20 @@ Recommandation : **Brevo** (ex-Sendinblue) — 300 emails/jour gratuits, pas de 
 
 **Vérif :** le bouton officiel Google s'affiche sur `/connexion` (au lieu du bouton de simulation) et la connexion crée un compte.
 
-## 5. Stockage des fichiers — dans Neon (choix acté, rien à configurer)
+## 5. Stockage des fichiers — Cloudinary (choix acté)
 
-Les fichiers (photos d'annonces, pièces KYC) sont stockés **directement dans la base Neon** (`STORAGE_DRIVER=db`, table `stored_files`) et servis par l'API via `GET /files/:id` :
-- **Photos d'annonces** : publiques, cache navigateur long (contenu immuable).
-- **Pièces KYC** : privées — servies uniquement avec un token **admin** ou celui du **propriétaire** du document (contrôle d'accès réel, vérifié par tests).
+Vercel n'a pas de disque persistant : en production, les fichiers vont sur **Cloudinary** (`STORAGE_DRIVER=cloudinary`). Le driver est implémenté et gère les deux niveaux d'accès :
+- **Photos d'annonces** : upload public, URL `https://res.cloudinary.com/...` stockée en base.
+- **Pièces KYC** : upload en mode `authenticated` — fichier non accessible par URL devinable, URL signée (non falsifiable) stockée en base.
 
-Aucun compte externe à créer. Deux limites à connaître :
-- **Quota Neon** : ~0,5 Go en gratuit — avec des photos ≤ 4 Mo, surveillez la jauge (Neon console → Storage) et passez au plan Launch (10 Go) quand nécessaire.
-- **Vercel** limite les corps de requête/réponse à ~4,5 Mo : les uploads sont déjà plafonnés à 5 Mo par Multer, restez sous 4 Mo par photo en pratique.
+Mise en place (15 min) :
+1. Créez un compte sur [cloudinary.com](https://cloudinary.com) (palier gratuit : 25 Go stockage + bande passante, largement suffisant au lancement).
+2. Dashboard → copiez l'« API Environment variable » : `cloudinary://<api_key>:<api_secret>@<cloud_name>`.
+3. Variables backend (Vercel) : `STORAGE_DRIVER=cloudinary` + `CLOUDINARY_URL=<valeur copiée>`.
 
-(Le driver Cloudinary reste disponible dans le code — `STORAGE_DRIVER=cloudinary` + `CLOUDINARY_URL` — si le volume d'images explose un jour.)
+**Vérif (recette)** : publier une annonce avec photo → l'URL en base commence par `https://res.cloudinary.com/...` et l'image s'affiche ; uploader une pièce KYC → son URL contient une signature (`s--...--`) et s'ouvre depuis /admin/kyc.
+
+*(Alternative disponible dans le code : `STORAGE_DRIVER=db` stocke les fichiers dans Neon — utile en secours, mais quota ~0,5 Go en gratuit et fichiers ≤ 4,5 Mo sur Vercel.)*
 
 ## 6. Base de données — Neon (choix acté)
 
@@ -111,7 +114,7 @@ Le monorepo donne **deux projets Vercel** distincts (même repo GitHub `5core-te
 
 ## 8. Premier déploiement (ordre exact)
 
-1. §1 secrets générés, §2 KKiaPay live, §3 SMTP, §4 Google, §5 stockage (rien à faire), §6 Neon migrée + seedée.
+1. §1 secrets générés, §2 KKiaPay live, §3 SMTP, §4 Google, §5 Cloudinary, §6 Neon migrée + seedée.
 2. Créez les deux projets Vercel (§7) avec toutes les variables **avant** le premier build.
 3. Poussez la branche de prod → Vercel build les deux projets.
 4. Branchez les domaines, puis reportez les URLs définitives : `FRONTEND_URL` (projet API), webhook KKiaPay (`https://api.okkaz.bj/api/v1/payments/webhook`), origins Google.
@@ -172,7 +175,8 @@ JWT_SECRET=<openssl rand -hex 64>
 JWT_REFRESH_SECRET=<openssl rand -hex 64>
 ENCRYPTION_KEY=<openssl rand -base64 32 — DÉFINITIVE>
 GOOGLE_CLIENT_ID=<xxxx.apps.googleusercontent.com>
-STORAGE_DRIVER=db
+STORAGE_DRIVER=cloudinary
+CLOUDINARY_URL=cloudinary://<key>:<secret>@<cloud>
 KKIAPAY_PUBLIC_KEY=<clé live>
 KKIAPAY_PRIVATE_KEY=<clé live>
 KKIAPAY_SECRET_KEY=<clé live>
