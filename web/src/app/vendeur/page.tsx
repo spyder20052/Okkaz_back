@@ -91,7 +91,20 @@ function UserSpaceContent() {
   const router = useRouter();
   const isPublished = searchParams.get("publie") === "success";
   const { user, refreshUser, logout } = useAuth();
-  const [tab, setTab] = useState<Tab>("overview");
+  const [tab, setTab] = useState<Tab>(() =>
+    searchParams.get("onglet") === "parametres" ? "settings" : "overview",
+  );
+
+  useEffect(() => {
+    if (searchParams.get("onglet") !== "parametres") return;
+    const frame = requestAnimationFrame(() => {
+      document.getElementById("verification-identite")?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [searchParams]);
 
   // --- Annonces du vendeur ---
   const [listings, setListings] = useState<Listing[]>([]);
@@ -709,7 +722,7 @@ function UserSpaceContent() {
             </button>
 
             {/* Vérification d'identité (KYC) */}
-            <section className={styles.settingsSection}>
+            <section id="verification-identite" className={styles.settingsSection}>
               <h3 className={styles.settingsSectionTitle}>
                 <span className={`${styles.settingsSectionIcon} ${styles.iconBlue}`}>
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M14 10h4M14 14h4M5 18h14"/></svg>

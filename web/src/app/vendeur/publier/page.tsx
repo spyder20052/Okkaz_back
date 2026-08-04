@@ -597,7 +597,7 @@ function PublishForm() {
             {kycBlocked && (
               <>
                 {" "}
-                <Link href="/vendeur" style={{ fontWeight: 800, textDecoration: "underline" }}>
+                <Link href="/vendeur?onglet=parametres#verification-identite" style={{ fontWeight: 800, textDecoration: "underline" }}>
                   Vérifier mon identité dans les paramètres
                 </Link>
               </>
