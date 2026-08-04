@@ -13,6 +13,8 @@
 import { randomUUID } from "crypto";
 import { promises as fs } from "fs";
 import path from "path";
+import { v2 as cloudinary, type UploadApiResponse } from "cloudinary";
+import { prisma } from "../config/prisma";
 import { env } from "../config/env";
 import { logger } from "../config/logger";
 import { AppError } from "../utils/AppError";
@@ -57,6 +59,101 @@ const unimplemented: StorageDriver = {
 };
 
 /**
+ * Driver base de données (production — fichiers stockés dans Neon/PostgreSQL).
+ *
+ * - Photos d'annonces (`listings/...`) : publiques, servies par
+ *   `GET /files/:id` sans authentification (cache long).
+ * - Pièces KYC (`kyc/<userId>/...`) : privées — `GET /files/:id` exige un
+ *   token ADMIN ou celui du propriétaire du document.
+ *
+ * Avantages : un seul fournisseur (Neon), contrôle d'accès réel sur les
+ * documents d'identité. Limites : quota de stockage du plan Neon, et
+ * fichiers ≤ ~4,5 Mo sur Vercel (limite des corps de requête/réponse).
+ */
+const dbDriver: StorageDriver = {
+  async upload(file, folder) {
+    const isPrivate = folder.startsWith("kyc");
+    // Convention d'appel : kyc/<userId> — le propriétaire est encodé dans le
+    // dossier par kyc.service.
+    const ownerId = isPrivate ? (folder.split("/")[1] ?? null) : null;
+    const stored = await prisma.storedFile.create({
+      data: {
+        mime: file.mimetype,
+        data: file.buffer,
+        folder,
+        isPrivate,
+        ownerId,
+      },
+      select: { id: true },
+    });
+    return { url: `/files/${stored.id}`, key: stored.id };
+  },
+};
+
+/**
+ * Driver Cloudinary (option CDN externe).
+ *
+ * - Photos d'annonces (`listings/...`) : upload public, URL `https` stockée
+ *   telle quelle en base.
+ * - Pièces KYC (`kyc/...`) : upload en mode `authenticated` — le fichier
+ *   n'est PAS accessible par URL devinable ; l'URL stockée est signée
+ *   (signature permanente, non falsifiable, non énumérable).
+ *
+ * Configuration : variable `CLOUDINARY_URL` (cloudinary://key:secret@cloud).
+ * Le SDK la lit automatiquement ; on vérifie seulement sa présence.
+ */
+const cloudinaryDriver: StorageDriver = {
+  async upload(file, folder) {
+    const isPrivate = folder.startsWith("kyc");
+    const publicId = randomUUID();
+
+    const result = await new Promise<UploadApiResponse>((resolve, reject) => {
+      const stream = cloudinary.uploader.upload_stream(
+        {
+          folder: `okkaz/${folder}`,
+          public_id: publicId,
+          resource_type: "image",
+          type: isPrivate ? "authenticated" : "upload",
+          overwrite: false,
+        },
+        (error, uploaded) => {
+          if (error || !uploaded) {
+            reject(
+              AppError.internal(
+                "STORAGE_UPLOAD_FAILED",
+                `Upload Cloudinary échoué : ${error?.message ?? "réponse vide"}`,
+              ),
+            );
+            return;
+          }
+          resolve(uploaded);
+        },
+      );
+      stream.end(file.buffer);
+    });
+
+    const key = result.public_id;
+    const url = isPrivate
+      ? cloudinary.url(key, {
+          type: "authenticated",
+          sign_url: true,
+          secure: true,
+          format: result.format,
+        })
+      : result.secure_url;
+    return { url, key };
+  },
+
+  async signedUrl(key) {
+    return cloudinary.url(key, {
+      type: "authenticated",
+      sign_url: true,
+      secure: true,
+    });
+  },
+};
+
+/**
  * Sélectionne le driver de stockage en fonction de `STORAGE_DRIVER`.
  * @returns L'implémentation du driver.
  * @private
@@ -65,8 +162,17 @@ function pickDriver(): StorageDriver {
   switch (env.STORAGE_DRIVER) {
     case "local":
       return localDriver;
-    case "s3":
+    case "db":
+      return dbDriver;
     case "cloudinary":
+      if (!env.CLOUDINARY_URL) {
+        logger.error(
+          "STORAGE_DRIVER=cloudinary mais CLOUDINARY_URL est vide — uploads refusés.",
+        );
+        return unimplemented;
+      }
+      return cloudinaryDriver;
+    case "s3":
       logger.warn(
         { driver: env.STORAGE_DRIVER },
         "Storage driver non implémenté, fallback non-op.",

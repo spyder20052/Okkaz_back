@@ -59,77 +59,69 @@ Recommandation : **Brevo** (ex-Sendinblue) — 300 emails/jour gratuits, pas de 
 
 **Vérif :** le bouton officiel Google s'affiche sur `/connexion` (au lieu du bouton de simulation) et la connexion crée un compte.
 
-## 5. Stockage des fichiers — décision
+## 5. Stockage des fichiers — dans Neon (choix acté, rien à configurer)
 
-Deux options :
+Les fichiers (photos d'annonces, pièces KYC) sont stockés **directement dans la base Neon** (`STORAGE_DRIVER=db`, table `stored_files`) et servis par l'API via `GET /files/:id` :
+- **Photos d'annonces** : publiques, cache navigateur long (contenu immuable).
+- **Pièces KYC** : privées — servies uniquement avec un token **admin** ou celui du **propriétaire** du document (contrôle d'accès réel, vérifié par tests).
 
-**Option A — disque local (recommandée pour le lancement)** : `STORAGE_DRIVER=local`, rien à coder. Contraintes : un seul serveur, et le dossier `uploads/` doit être un **volume persistant** inclus dans les sauvegardes (§11). C'est le choix simple et suffisant pour un MVP mono-serveur.
+Aucun compte externe à créer. Deux limites à connaître :
+- **Quota Neon** : ~0,5 Go en gratuit — avec des photos ≤ 4 Mo, surveillez la jauge (Neon console → Storage) et passez au plan Launch (10 Go) quand nécessaire.
+- **Vercel** limite les corps de requête/réponse à ~4,5 Mo : les uploads sont déjà plafonnés à 5 Mo par Multer, restez sous 4 Mo par photo en pratique.
 
-**Option B — Cloudinary (choix retenu dans RESTANT_A_FAIRE.md)** : nécessaire si multi-serveurs ou PaaS à disque éphémère (Railway, Render…). ⚠️ **Le driver n'est pas implémenté** (`backend/src/services/storage.service.ts` lève une erreur) — il faut installer le SDK `cloudinary`, implémenter le driver (photos publiques + **URLs privées signées pour les pièces KYC**) et tester : ~1 journée de dev à faire AVANT le déploiement si cette option est retenue.
+(Le driver Cloudinary reste disponible dans le code — `STORAGE_DRIVER=cloudinary` + `CLOUDINARY_URL` — si le volume d'images explose un jour.)
 
-➡️ Si vous prenez un VPS (option A), aucun blocage. Si vous visez un PaaS, dites-le-moi et j'implémente le driver S3 d'abord.
+## 6. Base de données — Neon (choix acté)
 
-## 6. Domaines & DNS (15 min + propagation)
+1. [console.neon.tech](https://console.neon.tech) → **Create project** : nom `okkaz`, région la plus proche (ex. `eu-central-1`), Postgres **16**.
+2. Dans « Connection details », copiez **deux** URLs :
+   - **Pooled connection** (host contenant `-pooler`) → `DATABASE_URL` — celle que l'app utilise (indispensable en serverless).
+   - **Direct connection** (sans `-pooler`) → `DIRECT_DATABASE_URL` — celle que les migrations Prisma utilisent (déjà câblé dans `schema.prisma`).
+   Les deux se terminent par `?sslmode=require`.
+3. Appliquez le schéma et les données initiales **depuis votre machine** :
+   ```bash
+   cd backend
+   DATABASE_URL="<pooled>" DIRECT_DATABASE_URL="<direct>" npx prisma migrate deploy
+   DATABASE_URL="<pooled>" npm run seed
+   ```
+4. Activez les **sauvegardes** : Neon fait du point-in-time recovery automatique (7 jours en gratuit) — vérifiez la rétention dans Settings → Storage.
 
-1. Achetez le domaine (ex. `okkaz.bj` — registrar béninois pour le .bj, ou `okkaz-benin.com` chez Cloudflare/OVH).
-2. Créez deux enregistrements A vers l'IP du serveur :
-   - `okkaz.bj` (ou `www`) → front
-   - `api.okkaz.bj` → backend
-3. Reportez le domaine partout :
+**Vérif** : `npx prisma migrate status` avec les URLs Neon → « Database schema is up to date! ».
 
-| Où | Variable | Valeur |
-|---|---|---|
-| `.env` serveur backend | `FRONTEND_URL` | `https://okkaz.bj` (CORS + liens emails) |
-| `.env` serveur backend | `NODE_ENV` | `production` |
-| Build front | `NEXT_PUBLIC_API_URL` | `https://api.okkaz.bj/api/v1` |
-| `web/next.config.ts` | `images.remotePatterns` | ajouter `{ protocol: "https", hostname: "api.okkaz.bj", pathname: "/uploads/**" }` |
-| Console Google (§4) | Authorized origins | `https://okkaz.bj` |
-| Dashboard KKiaPay (§2) | Webhook URL | `https://api.okkaz.bj/api/v1/payments/webhook` |
+## 7. Déploiement Vercel — deux projets sur le même repo
 
-## 7. Serveur (VPS recommandé, ~30 min)
+Le monorepo donne **deux projets Vercel** distincts (même repo GitHub `5core-team/okkaz_backend`, branche de prod) :
 
-Un VPS 2 vCPU / 4 Go (Hetzner ~7 €/mois, Contabo, OVH…) suffit largement.
+### 7a. Projet « okkaz-api » (backend)
+1. Vercel → Add New Project → importez le repo → **Root Directory : `backend`**.
+2. Le fichier `backend/vercel.json` est déjà en place : toutes les requêtes sont réécrites vers l'app Express (`backend/api/index.ts`) et le **cron des rappels d'avis** tourne chaque heure.
+3. Variables d'environnement (Production) — le récapitulatif complet est en fin de guide : `DATABASE_URL` (pooled Neon), `DIRECT_DATABASE_URL`, `JWT_SECRET`, `JWT_REFRESH_SECRET`, `ENCRYPTION_KEY`, `STORAGE_DRIVER=cloudinary`, `CLOUDINARY_URL`, clés KKiaPay live, SMTP, `GOOGLE_CLIENT_ID`, `WCC_PHONE_NUMBER`, `FRONTEND_URL`, `CRON_SECRET` (openssl rand -hex 32 — Vercel l'injecte automatiquement sur l'appel cron), `NODE_ENV=production`.
+4. Domaine du projet : `api.okkaz.bj` (Settings → Domains ; suivez les instructions DNS de Vercel).
 
-```bash
-# Sur le VPS (Ubuntu 24.04)
-apt update && apt install -y docker.io docker-compose-v2 caddy
-```
+### 7b. Projet « okkaz-web » (frontend)
+1. Add New Project → même repo → **Root Directory : `web`** (framework Next.js auto-détecté).
+2. Variables (Production) : `NEXT_PUBLIC_API_URL=https://api.okkaz.bj/api/v1`, `NEXT_PUBLIC_KKIAPAY_PUBLIC_KEY` (live), `NEXT_PUBLIC_KKIAPAY_SANDBOX=false`, `NEXT_PUBLIC_GOOGLE_CLIENT_ID`.
+3. Domaine : `okkaz.bj` (+ `www`).
+4. `web/next.config.ts` accepte déjà les images Cloudinary et du domaine API.
 
-Structure conseillée : le `docker-compose.yml` du repo démarre déjà Postgres ; ajoutez un service API (image Node 20, `npm ci && npm run build && npm run start`) avec un volume pour `uploads/`. **Caddy** en front des deux domaines — le HTTPS est automatique :
-
-```
-# /etc/caddy/Caddyfile
-api.okkaz.bj {
-    reverse_proxy localhost:3000
-}
-okkaz.bj {
-    reverse_proxy localhost:3002
-}
-```
-
-Note : j'ai ajouté `app.set('trust proxy', 1)` au backend (commit du 19 juil.) — le rate limiting voit maintenant la vraie IP du client derrière Caddy/nginx. Rien à faire, juste ne pas l'enlever.
-
-Le front Next : `npm ci && npm run build && npm run start -- -p 3002` (ou déployez-le sur **Vercel**, plus simple encore — dans ce cas seul `api.okkaz.bj` vit sur le VPS).
-
-⚠️ Votre planning mentionne un **staging déjà dockerisé par Larioce (S-1)** — vérifiez avec lui ce qui existe déjà avant de repartir de zéro : il y a peut-être juste à mettre à jour le compose et les variables.
+### Particularités serverless à connaître
+- Le **rate limiting** est en mémoire par instance : les quotas sont approximatifs sur Vercel (plusieurs instances) — acceptable au lancement ; passer sur un store Redis (Upstash) si besoin plus tard.
+- Les **logs** : Vercel → projet → Logs (ou `vercel logs`).
+- `trust proxy` est déjà activé en production (IP réelle du client vue par le rate limiter).
 
 ## 8. Premier déploiement (ordre exact)
 
-```bash
-# Sur le serveur, dans backend/ du monorepo
-cp .env.example .env            # remplir avec TOUTES les valeurs des §1-6
-docker compose up -d            # Postgres
-npm ci
-npx prisma migrate deploy       # applique les 4 migrations
-npm run seed                    # catégories + settings + admin
-npm run build && npm run start  # (ou via le service Docker / systemd / pm2)
-```
+1. §1 secrets générés, §2 KKiaPay live, §3 SMTP, §4 Google, §5 stockage (rien à faire), §6 Neon migrée + seedée.
+2. Créez les deux projets Vercel (§7) avec toutes les variables **avant** le premier build.
+3. Poussez la branche de prod → Vercel build les deux projets.
+4. Branchez les domaines, puis reportez les URLs définitives : `FRONTEND_URL` (projet API), webhook KKiaPay (`https://api.okkaz.bj/api/v1/payments/webhook`), origins Google.
 
 **Vérifs immédiates :**
 ```bash
 curl https://api.okkaz.bj/api/v1/health        # → {"success":true,...}
-curl -I https://api.okkaz.bj/api/v1/docs       # → 404 (Swagger DÉSACTIVÉ en production : normal et voulu)
+curl -I https://api.okkaz.bj/api/v1/docs       # → 404 (Swagger désactivé en production : voulu)
 ```
+Puis sur https://okkaz.bj : inscription, publication avec photo (Cloudinary), validation admin.
 
 ## 9. Sécuriser le compte admin (2 min, tout de suite après le seed)
 
@@ -174,12 +166,13 @@ Idéalement, synchronisez `/var/backups` vers un stockage externe (Backblaze B2,
 NODE_ENV=production
 PORT=3000
 FRONTEND_URL=https://okkaz.bj
-DATABASE_URL=postgresql://okkaz:<MDP_FORT>@localhost:5432/okkaz_dev
+DATABASE_URL=<URL poolée Neon (-pooler), sslmode=require>
+DIRECT_DATABASE_URL=<URL directe Neon, sslmode=require>
 JWT_SECRET=<openssl rand -hex 64>
 JWT_REFRESH_SECRET=<openssl rand -hex 64>
 ENCRYPTION_KEY=<openssl rand -base64 32 — DÉFINITIVE>
 GOOGLE_CLIENT_ID=<xxxx.apps.googleusercontent.com>
-STORAGE_DRIVER=local
+STORAGE_DRIVER=db
 KKIAPAY_PUBLIC_KEY=<clé live>
 KKIAPAY_PRIVATE_KEY=<clé live>
 KKIAPAY_SECRET_KEY=<clé live>
@@ -190,7 +183,8 @@ SMTP_PORT=587
 SMTP_USER=<login Brevo>
 SMTP_PASS=<clé SMTP Brevo>
 SMTP_FROM_EMAIL=no-reply@okkaz.bj
-WCC_PHONE_NUMBER=<numéro de mise en relation réel>
+WCC_PHONE_NUMBER=<numéro de mise en relation réel (modifiable ensuite via system_settings)>
+CRON_SECRET=<openssl rand -hex 32>
 
 # Front (.env.production ou variables Vercel)
 NEXT_PUBLIC_API_URL=https://api.okkaz.bj/api/v1

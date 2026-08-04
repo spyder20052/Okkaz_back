@@ -8,7 +8,7 @@ export async function cleanupDatabase() {
   // 1. Tables dépendantes des annonces ou des paiements
   await prisma.review.deleteMany();
   await prisma.report.deleteMany();
-  await prisma.contactAccess.deleteMany();
+  await prisma.contactReveal.deleteMany();
   await prisma.subscription.deleteMany();
   await prisma.listingPhoto.deleteMany(); // Bien que cascade, securité additionnelle
   

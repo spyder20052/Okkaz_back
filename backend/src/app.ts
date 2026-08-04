@@ -133,6 +133,63 @@ export function createApp(): Application {
   // ── Uploads locaux (dev) ─────────────────────────────────────────────────
   app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));
 
+  // ── Fichiers stockés en base (driver `db` — Neon en production) ──────────
+  // Photos d'annonces : publiques, cache long. Pièces KYC : privées —
+  // token ADMIN ou celui du propriétaire du document requis.
+  app.get('/files/:id', async (req, res, next) => {
+    try {
+      const { id } = req.params;
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+        return res.status(404).json({
+          success: false,
+          error: { code: 'FILE_NOT_FOUND', message: 'Fichier introuvable.' },
+        });
+      }
+      const { prisma } = await import('./config/prisma');
+      const file = await prisma.storedFile.findUnique({ where: { id } });
+      if (!file) {
+        return res.status(404).json({
+          success: false,
+          error: { code: 'FILE_NOT_FOUND', message: 'Fichier introuvable.' },
+        });
+      }
+      if (file.isPrivate) {
+        const header = req.headers.authorization ?? '';
+        const token = header.startsWith('Bearer ') ? header.slice(7) : null;
+        if (!token) {
+          return res.status(401).json({
+            success: false,
+            error: { code: 'UNAUTHORIZED', message: 'Authentification requise.' },
+          });
+        }
+        let payload: { userId: string; role: string };
+        try {
+          const { verifyAccessToken } = await import('./utils/jwt');
+          payload = verifyAccessToken(token);
+        } catch {
+          return res.status(401).json({
+            success: false,
+            error: { code: 'TOKEN_INVALID', message: 'Token invalide ou expiré.' },
+          });
+        }
+        if (payload.role !== 'ADMIN' && payload.userId !== file.ownerId) {
+          return res.status(403).json({
+            success: false,
+            error: { code: 'FORBIDDEN', message: 'Accès refusé à ce document.' },
+          });
+        }
+        res.setHeader('Cache-Control', 'private, no-store');
+      } else {
+        // Contenu immuable : l'id est unique par upload.
+        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      }
+      res.setHeader('Content-Type', file.mime);
+      return res.send(Buffer.from(file.data));
+    } catch (err) {
+      return next(err);
+    }
+  });
+
   // ── Swagger UI ───────────────────────────────────────────────────────────
   // Monté sur /api/v1/docs en dev et staging.
   // Désactiver en production via NODE_ENV=production.
@@ -218,6 +275,26 @@ export function createApp(): Application {
       data: { status: 'ok', env: env.NODE_ENV, ts: new Date().toISOString() },
     }),
   );
+
+  // ── Cron Vercel : rappels d'avis ─────────────────────────────────────────
+  // En serverless il n'y a pas de processus long-lived pour setInterval :
+  // Vercel Cron appelle cet endpoint (header Authorization: Bearer CRON_SECRET,
+  // injecté automatiquement par Vercel quand la variable est définie).
+  app.get(`${env.API_PREFIX}/jobs/review-reminders`, async (req, res, next) => {
+    try {
+      if (!env.CRON_SECRET || req.headers.authorization !== `Bearer ${env.CRON_SECRET}`) {
+        return res.status(401).json({
+          success: false,
+          error: { code: 'UNAUTHORIZED', message: 'Secret cron invalide.' },
+        });
+      }
+      const { runReviewReminders } = await import('./jobs/reviewReminder.job');
+      const sent = await runReviewReminders();
+      return res.status(200).json({ success: true, message: 'Rappels envoyés.', data: { sent } });
+    } catch (err) {
+      return next(err);
+    }
+  });
 
   // ── Routes API ───────────────────────────────────────────────────────────
   const prefix = env.API_PREFIX;

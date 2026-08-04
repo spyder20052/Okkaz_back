@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { api, ApiError, mediaUrl } from "@/lib/api";
+import { api, ApiError, mediaUrl, readAuth } from "@/lib/api";
 import type { KycDocument, KycDocumentType } from "@/lib/types";
 import AdminShell from "../AdminShell";
 import styles from "../admin.module.css";
@@ -101,10 +101,34 @@ export default function AdminKycPage() {
     }
   };
 
+  // Les pièces KYC stockées en base (/files/...) sont privées : le serveur
+  // exige le token admin. On les télécharge donc avec l'en-tête d'auth puis
+  // on ouvre le blob ; les anciennes URLs publiques s'ouvrent directement.
+  const openAuthenticated = async (url: string) => {
+    const absolute = mediaUrl(url);
+    if (!url.startsWith("/files/")) {
+      window.open(absolute, "_blank", "noopener");
+      return;
+    }
+    try {
+      const stored = readAuth();
+      const res = await fetch(absolute, {
+        headers: stored?.tokens?.accessToken
+          ? { Authorization: `Bearer ${stored.tokens.accessToken}` }
+          : {},
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const blob = await res.blob();
+      window.open(URL.createObjectURL(blob), "_blank", "noopener");
+    } catch {
+      setFeedback("Impossible d'ouvrir la pièce (session expirée ? rechargez la page).");
+    }
+  };
+
   const viewDocument = (doc: KycDocument) => {
-    window.open(mediaUrl(doc.frontUrl), "_blank", "noopener");
+    void openAuthenticated(doc.frontUrl);
     if (doc.backUrl) {
-      window.open(mediaUrl(doc.backUrl), "_blank", "noopener");
+      void openAuthenticated(doc.backUrl);
     }
   };
 

@@ -86,15 +86,12 @@ describe('Subscriptions Routes Integration Tests', () => {
   });
 
   afterAll(async () => {
-    const ids = [sellerId, sellerProId].filter(Boolean);
-    if (ids.length > 0) {
-      await prisma.subscription.deleteMany({
-        where: { userId: { in: ids } }
-      });
-      await prisma.payment.deleteMany({
-        where: { userId: { in: ids } }
-      });
-    }
+    // Nettoie par email : couvre les trois comptes créés par la suite (le
+    // troisième n'a pas d'id capturé mais peut avoir des paiements).
+    const emails = ['seller-subs-fix@test.com', 'sellerpro-subs-fix@test.com', 'buyer-subs-fix@test.com'];
+    await prisma.subscription.deleteMany({ where: { user: { email: { in: emails } } } });
+    await prisma.demandListing.deleteMany({ where: { user: { email: { in: emails } } } });
+    await prisma.payment.deleteMany({ where: { user: { email: { in: emails } } } });
     await prisma.user.deleteMany({
       where: {
         email: { in: ['seller-subs-fix@test.com', 'sellerpro-subs-fix@test.com', 'buyer-subs-fix@test.com'] },

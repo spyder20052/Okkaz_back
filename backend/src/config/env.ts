@@ -25,6 +25,8 @@ const envSchema = z.object({
   API_PREFIX: z.string().startsWith("/").default("/api/v1"),
   // OAuth Google (Sign in with Google) — vide = fonctionnalité désactivée.
   GOOGLE_CLIENT_ID: z.string().optional(),
+  // Secret du cron Vercel (rappels d'avis). Vide = endpoint cron désactivé.
+  CRON_SECRET: z.string().optional(),
 
   // DB
   DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
@@ -49,7 +51,9 @@ const envSchema = z.object({
   }, "ENCRYPTION_KEY doit être 32 octets encodés en base64"),
 
   // Storage
-  STORAGE_DRIVER: z.enum(["local", "s3", "cloudinary"]).default("local"),
+  // `db` = fichiers stockés dans PostgreSQL/Neon (choix de prod) ;
+  // `local` = disque (dev) ; `cloudinary` = CDN externe (optionnel).
+  STORAGE_DRIVER: z.enum(["local", "db", "s3", "cloudinary"]).default("local"),
   AWS_S3_BUCKET: z.string().optional(),
   AWS_S3_REGION: z.string().optional(),
   AWS_ACCESS_KEY_ID: z.string().optional(),

@@ -33,11 +33,9 @@ Ce document suit les tâches restantes après l'intégration du frontend Next.js
 
 ## Priorité 1 — Comptes et secrets externes
 
-- [ ] Créer ou sélectionner le compte Cloudinary de production.
-- [ ] Fournir `CLOUDINARY_URL` au backend.
-- [ ] Installer le SDK officiel Cloudinary après autorisation du téléchargement npm.
-- [ ] Stocker les photos d'annonces dans Cloudinary.
-- [ ] Protéger les pièces KYC avec des URLs privées temporaires, jamais des URLs publiques permanentes.
+- [x] **Décision (4 août) : fichiers stockés dans Neon** (`STORAGE_DRIVER=db`, table `stored_files`, servis par `GET /files/:id`) — aucun compte Cloudinary nécessaire.
+- [x] Stocker les photos d'annonces (publiques, cache immuable) — testé.
+- [x] Protéger les pièces KYC : accès restreint au token admin ou au propriétaire (401/403 vérifiés par tests).
 - [ ] Fournir les clés KKiaPay sandbox :
   - `KKIAPAY_PUBLIC_KEY`
   - `KKIAPAY_PRIVATE_KEY`
@@ -50,7 +48,7 @@ Ce document suit les tâches restantes après l'intégration du frontend Next.js
 
 ## Priorité 2 — Infrastructure de production
 
-- [ ] Choisir les hébergeurs du frontend, du backend et de PostgreSQL.
+- [x] Choisir les hébergeurs : **Vercel** (front + API, 2 projets Root Directory `web/` et `backend/`) + **Neon** (PostgreSQL 16 managé). Détail pas-à-pas dans GUIDE_MISE_EN_PRODUCTION.md §6-8.
 - [ ] Créer une base PostgreSQL 16 managée.
 - [ ] Configurer `DATABASE_URL` avec SSL en production.
 - [ ] Déployer le backend depuis `backend/Dockerfile`.
