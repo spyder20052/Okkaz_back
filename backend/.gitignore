@@ -47,4 +47,6 @@ AGENT.md
 .env.test
 
 Rapport(11-15 Mai).pdf
-Rapport(18-22 Mai).pdf
+Rapport(18-22 Mai).pdfPROD_SECRETS_A_CONSERVER.txt
+.vercel
+.env*
