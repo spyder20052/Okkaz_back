@@ -31,6 +31,7 @@ interface AuthContextValue {
   register: (input: RegisterInput) => Promise<ApiUser>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
+  becomeSeller: () => Promise<ApiUser>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -103,8 +104,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const becomeSeller = useCallback(async () => {
+    const res = await api.post<{ user: ApiUser }>("/users/me/become-seller");
+    // Le rôle est encodé dans l'access token (15 min) : on force une rotation
+    // pour que les routes vendeur acceptent immédiatement le nouveau rôle.
+    const stored = readAuth();
+    let tokens = stored?.tokens ?? null;
+    if (stored) {
+      try {
+        const refreshed = await api.post<{ accessToken: string; refreshToken: string }>(
+          "/auth/refresh-token",
+          { refreshToken: stored.tokens.refreshToken },
+          false,
+        );
+        tokens = refreshed.data;
+      } catch {
+        // À défaut, l'ancien token reste utilisable après son expiration naturelle.
+      }
+      writeAuth({ user: res.data.user, tokens: tokens! });
+    }
+    return res.data.user;
+  }, []);
+
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, register, logout, refreshUser }}>
+    <AuthContext.Provider
+      value={{ user, isLoading, login, register, logout, refreshUser, becomeSeller }}
+    >
       {children}
     </AuthContext.Provider>
   );

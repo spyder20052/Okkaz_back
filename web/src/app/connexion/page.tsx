@@ -3,11 +3,11 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import styles from "./connexion.module.css";
 import { useAuth } from "@/lib/auth";
 import { ApiError } from "@/lib/api";
-import type { ApiUser } from "@/lib/types";
+import type { ApiUser, UserRole } from "@/lib/types";
 
 type Mode = "login" | "register";
 
@@ -17,9 +17,23 @@ function homeForRole(user: ApiUser): string {
   return "/demandes";
 }
 
+// Reflète les règles du middleware (src/proxy.ts) : qui peut aller où.
+function roleAllows(role: UserRole, path: string): boolean {
+  if (path.startsWith("/admin")) return role === "ADMIN";
+  if (path.startsWith("/vendeur")) return role === "SELLER" || role === "SELLER_PRO" || role === "ADMIN";
+  return true;
+}
+
+const ROLE_LABELS: Record<UserRole, string> = {
+  BUYER: "Acheteur",
+  SELLER: "Vendeur",
+  SELLER_PRO: "Vendeur Premium",
+  ADMIN: "Administrateur",
+};
+
 export default function ConnexionPage() {
   const router = useRouter();
-  const { login, register } = useAuth();
+  const { user, isLoading, login, register, logout, becomeSeller } = useAuth();
 
   const [mode, setMode] = useState<Mode>("login");
   const [error, setError] = useState<string | null>(null);
@@ -40,6 +54,38 @@ export default function ConnexionPage() {
   function destinationFor(user: ApiUser): string {
     const requested = new URLSearchParams(window.location.search).get("next");
     return requested?.startsWith("/") && !requested.startsWith("//") ? requested : homeForRole(user);
+  }
+
+  // Déjà connecté avec un rôle suffisant pour la destination : on y retourne
+  // directement (l'AuthProvider vient de reposer le cookie de session que lit
+  // le middleware — couvre les sessions créées avant l'ajout du cookie).
+  const connectedDestination = user ? destinationForConnected(user) : null;
+  useEffect(() => {
+    if (!isLoading && user && connectedDestination) {
+      router.replace(connectedDestination);
+    }
+  }, [isLoading, user, connectedDestination, router]);
+
+  function destinationForConnected(u: ApiUser): string | null {
+    const dest = destinationFor(u);
+    return roleAllows(u.role, dest) ? dest : null;
+  }
+
+  async function handleBecomeSeller() {
+    setError(null);
+    setIsSubmitting(true);
+    try {
+      const updated = await becomeSeller();
+      router.replace(destinationFor(updated));
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Activation impossible. Réessayez.");
+      setIsSubmitting(false);
+    }
+  }
+
+  async function handleSwitchAccount() {
+    await logout();
+    setError(null);
   }
 
   async function handleLogin(e: FormEvent) {
@@ -135,7 +181,44 @@ export default function ConnexionPage() {
           </p>
         )}
 
-        {mode === "login" ? (
+        {user && connectedDestination ? (
+          // Session valide + rôle suffisant : redirection en cours (useEffect).
+          <p className={styles.subtitle}>Reconnexion en cours…</p>
+        ) : user ? (
+          // Connecté mais rôle insuffisant pour la page demandée (ex. acheteur
+          // qui clique « Publier un bien ») : expliquer au lieu de re-demander
+          // une connexion.
+          <div className={styles.form}>
+            <p className={styles.subtitle}>
+              Vous êtes connecté en tant que <strong>{user.firstName}</strong> (
+              {ROLE_LABELS[user.role]}).
+            </p>
+            {user.role === "BUYER" ? (
+              <>
+                <p className={styles.subtitle}>
+                  La publication d&apos;annonces nécessite un compte vendeur. Vous pouvez
+                  activer le mode vendeur sur ce compte — une vérification d&apos;identité
+                  (KYC) vous sera ensuite demandée avant la première publication.
+                </p>
+                <button
+                  type="button"
+                  className={styles.btnApple}
+                  disabled={isSubmitting}
+                  onClick={handleBecomeSeller}
+                >
+                  {isSubmitting ? "Activation…" : "Activer le mode vendeur"}
+                </button>
+              </>
+            ) : (
+              <p className={styles.subtitle}>
+                Cette page est réservée à un autre type de compte.
+              </p>
+            )}
+            <button type="button" className={styles.switchMode} onClick={handleSwitchAccount}>
+              Se déconnecter et changer de compte
+            </button>
+          </div>
+        ) : mode === "login" ? (
           <form className={styles.form} onSubmit={handleLogin}>
             <label className={styles.field}>
               <span className={styles.label}>Email ou téléphone</span>

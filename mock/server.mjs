@@ -341,6 +341,12 @@ route("PATCH", "users/me/password", (ctx) => {
   user.password = ctx.body.newPassword;
   ok(ctx.res, null, "Mot de passe modifié. Reconnectez-vous.");
 });
+route("POST", "users/me/become-seller", (ctx) => {
+  const user = requireAuth(ctx.req, ctx.res, ["BUYER"]); if (!user) return;
+  user.role = "SELLER";
+  if (user.kycStatus !== "APPROVED") user.status = "PENDING_KYC";
+  ok(ctx.res, { user: publicUser(user) }, "Mode vendeur activé. Vérifiez votre identité (KYC) pour publier.");
+});
 route("GET", "users/me/listings", (ctx) => {
   const user = requireAuth(ctx.req, ctx.res, ["SELLER", "SELLER_PRO"]); if (!user) return;
   const items = db.listings

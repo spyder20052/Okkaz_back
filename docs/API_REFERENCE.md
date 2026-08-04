@@ -89,6 +89,7 @@ Objet `user` : `{ id, email, phone, firstName, lastName, role, status, kycStatus
 | `GET /users/me` | Bearer | — | `{ user }` (+ `city`, `address`, `profilePhotoUrl`, `reportsCount`, `lastLoginAt`, `createdAt`) |
 | `PATCH /users/me` | Bearer | `{ firstName?, lastName?, city? (≤100), address? (≤500), profilePhotoUrl? (URL) }` | `{ user }` — email/téléphone **non modifiables** |
 | `PATCH /users/me/password` | Bearer | `{ currentPassword, newPassword }` | `null` — **déconnecte toutes les sessions** |
+| `POST /users/me/become-seller` | BUYER | — | `{ user }` — active le mode vendeur (role SELLER, status PENDING_KYC : KYC requis avant publication). ⚠️ Le rôle est encodé dans l'access token : appeler ensuite `POST /auth/refresh-token` pour un token à jour (géré par `useAuth().becomeSeller()`) |
 | `GET /users/me/listings` | SELLER, SELLER_PRO | paginé | annonces du vendeur, **tous statuts**, avec photo de couverture + catégorie |
 | `GET /users/me/contact-reveals` | BUYER | paginé | historique des contacts consultés (+ annonce) |
 | `GET /users/me/payments` | Bearer | paginé | paiements de l'utilisateur |

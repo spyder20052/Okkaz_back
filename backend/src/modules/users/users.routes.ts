@@ -26,6 +26,8 @@ router.patch(
   validateRequest({ body: schemas.changePasswordSchema }),
   asyncHandler(controller.changePassword),
 );
+// Un acheteur peut activer le mode vendeur en libre-service (KYC requis ensuite).
+router.post('/me/become-seller', authenticate, authorize('BUYER'), asyncHandler(controller.becomeSeller));
 
 router.get('/me/listings', authenticate, authorize('SELLER', 'SELLER_PRO'), asyncHandler(controller.getMyListings));
 // Un vendeur peut aussi consulter des contacts : historique ouvert à tous les rôles consommateurs.
