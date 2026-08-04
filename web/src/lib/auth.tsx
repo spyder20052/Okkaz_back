@@ -55,6 +55,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     queueMicrotask(() => {
       sync();
       setIsLoading(false);
+      // Auto-réparation des sessions antérieures à la suppression du rôle
+      // BUYER : on recharge le profil depuis l'API pour rafraîchir le rôle
+      // stocké (localStorage + cookie lu par le middleware).
+      const stored = readAuth();
+      if (stored) {
+        void api
+          .get<{ user: ApiUser }>("/users/me")
+          .then(async (res) => {
+            if (res.data.user.role === stored.user.role) return;
+            // Le rôle a changé côté serveur : on fait tourner les tokens tout
+            // de suite (le rôle est encodé dans l'access token, sinon les
+            // routes protégées refuseraient encore pendant 15 min).
+            let tokens = readAuth()?.tokens ?? stored.tokens;
+            try {
+              const rotated = await api.post<{ accessToken: string; refreshToken: string }>(
+                "/auth/refresh-token",
+                { refreshToken: tokens.refreshToken },
+                false,
+              );
+              tokens = rotated.data;
+            } catch {
+              // À défaut, la rotation aura lieu à l'expiration naturelle (≤15 min).
+            }
+            writeAuth({ user: res.data.user, tokens });
+          })
+          .catch(() => {
+            // API indisponible ou session expirée : rien à réparer ici.
+          });
+      }
     });
     window.addEventListener(AUTH_UPDATED_EVENT, sync);
     window.addEventListener("storage", sync);
