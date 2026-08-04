@@ -65,6 +65,13 @@ function loadSwaggerSpec(): Record<string, unknown> {
 export function createApp(): Application {
   const app = express();
 
+  // Derrière un reverse proxy (nginx/Caddy/PaaS), fait confiance au premier
+  // saut pour X-Forwarded-For : indispensable pour que le rate limiting
+  // s'applique à l'IP réelle du client et non à celle du proxy.
+  if (env.NODE_ENV === 'production' || env.NODE_ENV === 'staging') {
+    app.set('trust proxy', 1);
+  }
+
   const docsPath = `${env.API_PREFIX}/docs`;
 
   // ── Sécurité ─────────────────────────────────────────────────────────────

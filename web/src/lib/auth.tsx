@@ -32,6 +32,7 @@ interface AuthContextValue {
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
   becomeSeller: () => Promise<ApiUser>;
+  loginWithGoogle: (idToken: string) => Promise<ApiUser>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -104,6 +105,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const loginWithGoogle = useCallback(async (idToken: string) => {
+    const res = await api.post<AuthPayload>("/auth/oauth/google", { idToken }, false);
+    writeAuth({ user: res.data.user, tokens: res.data.tokens });
+    return res.data.user;
+  }, []);
+
   const becomeSeller = useCallback(async () => {
     const res = await api.post<{ user: ApiUser }>("/users/me/become-seller");
     // Le rôle est encodé dans l'access token (15 min) : on force une rotation
@@ -128,7 +135,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, isLoading, login, register, logout, refreshUser, becomeSeller }}
+      value={{ user, isLoading, login, register, logout, refreshUser, becomeSeller, loginWithGoogle }}
     >
       {children}
     </AuthContext.Provider>

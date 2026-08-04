@@ -317,6 +317,23 @@ route("POST", "auth/logout", (ctx) => {
   ok(ctx.res, null, "Déconnexion réussie.");
 });
 
+route("POST", "auth/oauth/google", (ctx) => {
+  // Mock : n'importe quel idToken connecte (ou crée) le compte Google de démo.
+  if (!ctx.body?.idToken) {
+    return fail(ctx.res, 422, "VALIDATION_ERROR", "Corps invalide.", [{ path: "body.idToken", message: "Requis" }]);
+  }
+  let user = db.users.find((u) => u.email === "google.user@okkaz.bj");
+  if (!user) {
+    user = addUser({
+      email: "google.user@okkaz.bj", phone: null, password: null,
+      firstName: "Awa", lastName: "Google", role: "BUYER", city: "Cotonou",
+    });
+    user.googleId = "mock-google-sub";
+  }
+  user.lastLoginAt = now();
+  ok(ctx.res, { user: publicUser(user), tokens: issueTokens(user) }, "Connexion Google réussie.");
+});
+
 route("POST", "auth/forgot-password", (ctx) => ok(ctx.res, null, "Si le compte existe, un email a été envoyé."));
 route("POST", "auth/reset-password/:token", (ctx) => ok(ctx.res, null, "Mot de passe réinitialisé."));
 route("GET", "auth/verify-email/:token", (ctx) => ok(ctx.res, null, "Email vérifié."));
