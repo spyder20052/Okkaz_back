@@ -42,17 +42,6 @@ export async function changePassword(req: Request, res: Response): Promise<Respo
 }
 
 /**
- * `POST /users/me/become-seller` — Active le mode vendeur (BUYER → SELLER).
- *
- * @param req - Aucun body.
- * @param res - 200 OK avec `{ user }` mis à jour (KYC requis avant publication).
- */
-export async function becomeSeller(req: Request, res: Response): Promise<Response> {
-  const user = await service.becomeSeller(req.user!.id);
-  return sendSuccess(res, { user }, 'Mode vendeur activé. Vérifiez votre identité (KYC) pour publier.');
-}
-
-/**
  * `GET /users/:id` — Profil public d'un utilisateur.
  *
  * @param req - Param `:id` (UUID).

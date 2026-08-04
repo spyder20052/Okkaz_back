@@ -18,7 +18,7 @@ const PASSWORD = "Test@1234";
 async function main(): Promise<void> {
   const passwordHash = await bcrypt.hash(PASSWORD, 12);
 
-  // 1) Acheteur (BUYER) — c'est lui qui paiera pour voir le contact.
+  // 1) Compte standard — il consulte le contact comme tout membre connecté.
   const buyer = await prisma.user.upsert({
     where: { email: "buyer@okkaz.test" },
     update: {},
@@ -28,7 +28,7 @@ async function main(): Promise<void> {
       passwordHash,
       firstName: "Bob",
       lastName: "Buyer",
-      role: UserRole.BUYER,
+      role: UserRole.SELLER,
       status: UserStatus.ACTIVE,
       isEmailVerified: true,
     },

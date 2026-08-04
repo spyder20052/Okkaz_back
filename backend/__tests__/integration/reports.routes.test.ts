@@ -26,7 +26,7 @@ describe('Reports Routes Integration Tests', () => {
         firstName: 'Buyer',
         lastName: 'Test',
         phone: '1122334466',
-        role: UserRole.BUYER,
+        role: UserRole.SELLER,
         isEmailVerified: true,
       },
     });

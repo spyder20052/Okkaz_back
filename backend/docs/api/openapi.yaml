@@ -95,7 +95,7 @@ components:
           type: string
         role:
           type: string
-          enum: [BUYER, SELLER, SELLER_PRO, ADMIN]
+          enum: [SELLER, SELLER_PRO, ADMIN]
         status:
           type: string
           enum: [ACTIVE, SUSPENDED, BLOCKED, PENDING_KYC]
@@ -167,10 +167,6 @@ paths:
                 password:
                   type: string
                   minLength: 8
-                role:
-                  type: string
-                  enum: [BUYER, SELLER]
-                  default: BUYER
       responses:
         "201":
           description: Inscription réussie

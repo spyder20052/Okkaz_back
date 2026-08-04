@@ -37,7 +37,7 @@ describe('POST /api/v1/auth/oauth/google (Integration)', () => {
     await prisma.$disconnect();
   });
 
-  it('crée un compte BUYER actif à la première connexion Google', async () => {
+  it('crée un compte SELLER actif à la première connexion Google', async () => {
     stubTokeninfo(TOKEN_INFO);
 
     const res = await request(app)
@@ -46,7 +46,7 @@ describe('POST /api/v1/auth/oauth/google (Integration)', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.data.user.email).toBe('google.user@test.com');
-    expect(res.body.data.user.role).toBe('BUYER');
+    expect(res.body.data.user.role).toBe('SELLER');
     expect(res.body.data.user.isEmailVerified).toBe(true);
     expect(res.body.data.tokens.accessToken).toBeDefined();
 

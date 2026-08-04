@@ -18,7 +18,6 @@ import {
 import styles from "./detail.module.css";
 
 const ROLE_LABELS: Record<string, string> = {
-  BUYER: "Membre OKKAZ",
   SELLER: "Vendeur",
   SELLER_PRO: "Vendeur Pro",
   ADMIN: "Équipe OKKAZ",

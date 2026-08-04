@@ -5,11 +5,11 @@
  * | Méthode | Chemin         | Rôle(s)                    | Description                 |
  * |---------|----------------|----------------------------|-----------------------------|
  * | POST    | /initiate      | Tout compte authentifié    | Initie une demande + paiement |
- * | GET     | /              | SELLER_PRO                 | Demandes pro (STD + EXPRESS)  |
- * | GET     | /standard      | SELLER, SELLER_PRO         | Demandes STANDARD publiques   |
+ * | GET     | /              | SELLER_PRO, ADMIN          | Demandes pro (STD + EXPRESS)  |
+ * | GET     | /standard      | Tout compte                | Demandes STANDARD publiques   |
  * | GET     | /me            | Tout compte authentifié    | Mes demandes                  |
  * | GET     | /:id           | SELLER, SELLER_PRO, ADMIN  | Détail d'une demande          |
- * | PATCH   | /:id/close     | BUYER, ADMIN               | Clôturer une demande          |
+ * | PATCH   | /:id/close     | Tout compte                | Clôturer une demande          |
  */
 import { Router } from 'express';
 import * as controller from './demands.controller';
@@ -26,15 +26,15 @@ const router = Router();
 router.post(
   '/initiate',
   authenticate,
-  authorize('BUYER', 'SELLER', 'SELLER_PRO', 'ADMIN'),
+  authorize('SELLER', 'SELLER_PRO', 'ADMIN'),
   validateRequest({ body: schemas.initiateDemandSchema }),
   asyncHandler(controller.initiate),
 );
 
-router.get('/', authenticate, authorize('SELLER_PRO'), asyncHandler(controller.listPro));
-router.get('/standard', authenticate, authorize('SELLER', 'SELLER_PRO'), asyncHandler(controller.listStandard));
+router.get('/', authenticate, authorize('SELLER_PRO', 'ADMIN'), asyncHandler(controller.listPro));
+router.get('/standard', authenticate, authorize('SELLER', 'SELLER_PRO', 'ADMIN'), asyncHandler(controller.listStandard));
 
-router.get('/me', authenticate, authorize('BUYER', 'SELLER', 'SELLER_PRO', 'ADMIN'), asyncHandler(controller.mine));
+router.get('/me', authenticate, authorize('SELLER', 'SELLER_PRO', 'ADMIN'), asyncHandler(controller.mine));
 router.get(
   '/:id',
   authenticate,
@@ -45,7 +45,7 @@ router.get(
 router.patch(
   '/:id/close',
   authenticate,
-  authorize('BUYER', 'SELLER', 'SELLER_PRO', 'ADMIN'),
+  authorize('SELLER', 'SELLER_PRO', 'ADMIN'),
   validateRequest({ params: schemas.demandIdParamSchema }),
   asyncHandler(controller.close),
 );

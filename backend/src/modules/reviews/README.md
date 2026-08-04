@@ -1,6 +1,6 @@
 # Module Reviews (Avis & Notes)
 
-La réputation de la plateforme passe par la réputation des vendeurs. Les utilisateurs (`BUYER` vérifiés) ont la permission de rédiger des avis.
+La réputation de la plateforme passe par la réputation des vendeurs. Tout compte ayant obtenu le contact peut rédiger un avis.
 
 ## Modalités
 

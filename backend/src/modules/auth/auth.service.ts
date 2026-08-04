@@ -99,9 +99,9 @@ async function issueTokens(
  * Inscription d'un nouvel utilisateur.
  *
  * Flux : hachage bcrypt → création en DB → envoi email de vérification → émission tokens.
- * Un SELLER démarre en `PENDING_KYC`, un BUYER en `ACTIVE`.
+ * Tout nouveau compte démarre comme SELLER actif. Le KYC ne conditionne que la publication.
  *
- * @param input - Données d'inscription (email, phone, password, firstName, lastName, role).
+ * @param input - Données d'inscription (email, phone, password, firstName, lastName).
  * @returns `{ user, tokens }`.
  * @throws {AppError} 409 si un compte existe déjà avec cet email/téléphone.
  */
@@ -121,10 +121,6 @@ export async function register(
   const passwordHash = await bcrypt.hash(input.password, BCRYPT_ROUNDS);
   const emailVerificationToken = generateRandomToken();
 
-  // Un SELLER démarre en statut PENDING_KYC — il doit soumettre son KYC.
-  const status: UserStatus =
-    input.role === "SELLER" ? UserStatus.PENDING_KYC : UserStatus.ACTIVE;
-
   const user = await prisma.user.create({
     data: {
       email: input.email,
@@ -132,8 +128,8 @@ export async function register(
       passwordHash,
       firstName: input.firstName,
       lastName: input.lastName,
-      role: input.role as UserRole,
-      status,
+      role: UserRole.SELLER,
+      status: UserStatus.ACTIVE,
       emailVerificationToken,
     },
   });
@@ -257,7 +253,7 @@ async function verifyGoogleIdToken(idToken: string): Promise<GoogleTokenInfo> {
  *
  * - Compte trouvé par `googleId` ou par email → connexion (liaison du
  *   `googleId` si première connexion Google sur un compte classique).
- * - Aucun compte → création d'un BUYER actif, sans mot de passe ni téléphone.
+ * - Aucun compte → création d'un SELLER actif, sans mot de passe ni téléphone.
  *
  * @param idToken - ID token Google Identity Services.
  * @returns `{ user, tokens }`.
@@ -284,7 +280,7 @@ export async function loginWithGoogle(
         googleId: info.sub,
         firstName: info.given_name ?? "Utilisateur",
         lastName: info.family_name ?? "Google",
-        role: UserRole.BUYER,
+        role: UserRole.SELLER,
         status: UserStatus.ACTIVE,
         isEmailVerified: info.email_verified === "true",
         profilePhotoUrl: info.picture ?? null,

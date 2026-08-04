@@ -77,7 +77,7 @@ describe('Payments Routes (Integration)', () => {
         passwordHash,
         firstName: 'Buyer',
         lastName: 'Pay',
-        role: 'BUYER',
+        role: 'SELLER',
         status: 'ACTIVE',
         isEmailVerified: true,
       },

@@ -10,7 +10,7 @@ import SellerShell from "../../vendeur/SellerShell";
 import styles from "../../vendeur/vendeur.module.css";
 
 const TOTAL_STEPS = 4;
-const DEMAND_ROLES = ["BUYER", "SELLER", "SELLER_PRO", "ADMIN"];
+const DEMAND_ROLES = ["SELLER", "SELLER_PRO", "ADMIN"];
 
 export default function NewRequestPage() {
   const router = useRouter();

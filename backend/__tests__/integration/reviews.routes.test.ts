@@ -28,7 +28,7 @@ describe('Reviews Routes Integration Tests', () => {
         firstName: 'Buyer',
         lastName: 'Reviews',
         phone: '1122334411',
-        role: UserRole.BUYER,
+        role: UserRole.SELLER,
         isEmailVerified: true,
       },
     });
@@ -157,8 +157,8 @@ describe('Reviews Routes Integration Tests', () => {
       reviewId = res.body.data.review.id;
     });
 
-    it('doit echouer (403) si non BUYER (SELLER n\'a pas acces normalement, mais le test est pour un user sans acces)', async () => {
-      // Un autre buyer qui n'a pas l'accès contact
+    it('doit echouer (403) si le compte n’a pas obtenu l’accès au contact', async () => {
+      // Un autre compte qui n'a pas l'accès contact
       const anotherBuyer = await prisma.user.create({
         data: {
           email: 'buyer-reviews-2-fix@test.com',
@@ -166,7 +166,7 @@ describe('Reviews Routes Integration Tests', () => {
           firstName: 'Buyer',
           lastName: 'Reviews 2',
           phone: '1122334444',
-          role: UserRole.BUYER,
+          role: UserRole.SELLER,
           isEmailVerified: true,
         },
       }); 

@@ -30,8 +30,7 @@ type Mode = "login" | "register";
 
 function homeForRole(user: ApiUser): string {
   if (user.role === "ADMIN") return "/admin";
-  if (user.role === "SELLER" || user.role === "SELLER_PRO") return "/vendeur";
-  return "/demandes";
+  return "/vendeur";
 }
 
 // Reflète les règles du middleware (src/proxy.ts) : qui peut aller où.
@@ -42,7 +41,6 @@ function roleAllows(role: UserRole, path: string): boolean {
 }
 
 const ROLE_LABELS: Record<UserRole, string> = {
-  BUYER: "Acheteur",
   SELLER: "Vendeur",
   SELLER_PRO: "Vendeur Premium",
   ADMIN: "Administrateur",
@@ -50,7 +48,7 @@ const ROLE_LABELS: Record<UserRole, string> = {
 
 export default function ConnexionPage() {
   const router = useRouter();
-  const { user, isLoading, login, register, logout, becomeSeller, loginWithGoogle } = useAuth();
+  const { user, isLoading, login, register, logout, loginWithGoogle } = useAuth();
 
   const [mode, setMode] = useState<Mode>("login");
   const [error, setError] = useState<string | null>(null);
@@ -124,7 +122,6 @@ export default function ConnexionPage() {
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [registerPassword, setRegisterPassword] = useState("");
-  const [role, setRole] = useState<"BUYER" | "SELLER">("BUYER");
 
   function destinationFor(user: ApiUser): string {
     const requested = new URLSearchParams(window.location.search).get("next");
@@ -144,18 +141,6 @@ export default function ConnexionPage() {
   function destinationForConnected(u: ApiUser): string | null {
     const dest = destinationFor(u);
     return roleAllows(u.role, dest) ? dest : null;
-  }
-
-  async function handleBecomeSeller() {
-    setError(null);
-    setIsSubmitting(true);
-    try {
-      const updated = await becomeSeller();
-      router.replace(destinationFor(updated));
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Activation impossible. Réessayez.");
-      setIsSubmitting(false);
-    }
   }
 
   async function handleSwitchAccount() {
@@ -194,7 +179,6 @@ export default function ConnexionPage() {
         email,
         phone,
         password: registerPassword,
-        role,
       });
       router.push(destinationFor(user));
     } catch (err) {
@@ -260,35 +244,15 @@ export default function ConnexionPage() {
           // Session valide + rôle suffisant : redirection en cours (useEffect).
           <p className={styles.subtitle}>Reconnexion en cours…</p>
         ) : user ? (
-          // Connecté mais rôle insuffisant pour la page demandée (ex. acheteur
-          // qui clique « Publier un bien ») : expliquer au lieu de re-demander
-          // une connexion.
+          // Connecté mais rôle insuffisant pour la page demandée.
           <div className={styles.form}>
             <p className={styles.subtitle}>
               Vous êtes connecté en tant que <strong>{user.firstName}</strong> (
               {ROLE_LABELS[user.role]}).
             </p>
-            {user.role === "BUYER" ? (
-              <>
-                <p className={styles.subtitle}>
-                  La publication d&apos;annonces nécessite un compte vendeur. Vous pouvez
-                  activer le mode vendeur sur ce compte — une vérification d&apos;identité
-                  (KYC) vous sera ensuite demandée avant la première publication.
-                </p>
-                <button
-                  type="button"
-                  className={styles.btnApple}
-                  disabled={isSubmitting}
-                  onClick={handleBecomeSeller}
-                >
-                  {isSubmitting ? "Activation…" : "Activer le mode vendeur"}
-                </button>
-              </>
-            ) : (
-              <p className={styles.subtitle}>
-                Cette page est réservée à un autre type de compte.
-              </p>
-            )}
+            <p className={styles.subtitle}>
+              Cette page est réservée à un autre type de compte.
+            </p>
             <button type="button" className={styles.switchMode} onClick={handleSwitchAccount}>
               Se déconnecter et changer de compte
             </button>
@@ -388,24 +352,8 @@ export default function ConnexionPage() {
                 required
               />
             </label>
-            <div className={styles.roleChoice}>
-              <button
-                type="button"
-                className={role === "BUYER" ? styles.roleActive : styles.roleBtn}
-                onClick={() => setRole("BUYER")}
-              >
-                Compte personnel
-              </button>
-              <button
-                type="button"
-                className={role === "SELLER" ? styles.roleActive : styles.roleBtn}
-                onClick={() => setRole("SELLER")}
-              >
-                Je veux aussi publier
-              </button>
-            </div>
             <p className={styles.subtitle} style={{ margin: 0 }}>
-              Tous les comptes peuvent consulter, demander, contacter et payer. Le compte vendeur ajoute la publication de biens.
+              Tous les comptes peuvent consulter, demander et contacter. La vérification KYC est demandée uniquement pour publier un bien.
             </p>
             <button type="submit" className={styles.btnApple} disabled={isSubmitting}>
               {isSubmitting ? "Création…" : "Créer mon compte"}

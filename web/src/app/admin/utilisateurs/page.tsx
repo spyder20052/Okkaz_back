@@ -26,7 +26,6 @@ type UserDetail = ApiUser & {
 };
 
 const ROLE_LABELS: Record<UserRole, string> = {
-  BUYER: "Membre",
   SELLER: "Vendeur",
   SELLER_PRO: "Vendeur Pro",
   ADMIN: "Admin",

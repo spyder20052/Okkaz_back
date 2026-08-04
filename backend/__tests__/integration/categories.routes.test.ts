@@ -28,7 +28,7 @@ beforeAll(async () => {
     },
   });
 
-  // Create BUYER
+  // Crée un second compte standard
   const buyerPwd = await bcrypt.hash('Buyer@123', 10);
   const buyer = await prisma.user.create({
     data: {
@@ -36,7 +36,7 @@ beforeAll(async () => {
       passwordHash: buyerPwd,
       firstName: 'Buyer',
       lastName: 'User',
-      role: 'BUYER',
+      role: 'SELLER',
       isEmailVerified: true,
       city: 'Paris',
       phone: '1111111111',

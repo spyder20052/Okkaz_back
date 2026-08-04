@@ -22,7 +22,7 @@ router.get('/:id', validateRequest({ params: schemas.listingIdParamSchema }), as
 router.post(
   '/:id/contact',
   authenticate,
-  authorize('BUYER', 'SELLER', 'SELLER_PRO', 'ADMIN'),
+  authorize('SELLER', 'SELLER_PRO', 'ADMIN'),
   validateRequest({ params: schemas.listingIdParamSchema }),
   asyncHandler(controller.revealContact),
 );
@@ -30,7 +30,7 @@ router.post(
 router.post(
   '/',
   authenticate,
-  authorize('SELLER', 'SELLER_PRO'),
+  authorize('SELLER', 'SELLER_PRO', 'ADMIN'),
   validateRequest({ body: schemas.createListingSchema }),
   asyncHandler(controller.create),
 );
@@ -52,7 +52,7 @@ router.delete(
 router.post(
   '/:id/photos',
   authenticate,
-  authorize('SELLER', 'SELLER_PRO'),
+  authorize('SELLER', 'SELLER_PRO', 'ADMIN'),
   validateRequest({ params: schemas.listingIdParamSchema }),
   upload.array('photos', 20),
   asyncHandler(controller.uploadPhotos),
@@ -68,14 +68,14 @@ router.delete(
 router.patch(
   '/:id/pause',
   authenticate,
-  authorize('SELLER', 'SELLER_PRO'),
+  authorize('SELLER', 'SELLER_PRO', 'ADMIN'),
   validateRequest({ params: schemas.listingIdParamSchema }),
   asyncHandler(controller.pause),
 );
 router.patch(
   '/:id/resume',
   authenticate,
-  authorize('SELLER', 'SELLER_PRO'),
+  authorize('SELLER', 'SELLER_PRO', 'ADMIN'),
   validateRequest({ params: schemas.listingIdParamSchema }),
   asyncHandler(controller.resume),
 );

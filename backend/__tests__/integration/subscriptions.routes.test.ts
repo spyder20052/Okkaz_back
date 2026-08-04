@@ -51,7 +51,7 @@ describe('Subscriptions Routes Integration Tests', () => {
         firstName: 'Buyer',
         lastName: 'Subs',
         phone: '5544332233',
-        role: UserRole.BUYER,
+        role: UserRole.SELLER,
         isEmailVerified: true,
       },
     });
@@ -115,7 +115,7 @@ describe('Subscriptions Routes Integration Tests', () => {
   });
 
   describe('POST /api/v1/subscriptions/subscribe', () => {
-    it('doit echouer (403) si BUYER', async () => {
+    it('doit autoriser un membre standard à souscrire', async () => {
       const res = await request(app)
         .post('/api/v1/subscriptions/subscribe')
         .set('Authorization', `Bearer ${buyerToken}`)
@@ -124,7 +124,7 @@ describe('Subscriptions Routes Integration Tests', () => {
           method: 'MOBILE_MONEY'
         });
       
-      expect(res.status).toBe(403);
+      expect(res.status).toBe(201);
     });
 
     it('doit creer une transaction dabonnement (201 Created) pour un SELLER sans abo actif', async () => {

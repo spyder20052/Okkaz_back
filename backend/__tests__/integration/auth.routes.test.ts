@@ -29,7 +29,7 @@ describe('Auth Routes (Integration)', () => {
         .post('/api/v1/auth/register')
         .send({
           ...testUser,
-          role: 'BUYER',
+          role: 'SELLER',
         });
 
       expect(res.status).toBe(201);
@@ -47,7 +47,7 @@ describe('Auth Routes (Integration)', () => {
         .post('/api/v1/auth/register')
         .send({
           ...testUser,
-          role: 'BUYER',
+          role: 'SELLER',
         });
       expect(res.status).toBe(409);
     });

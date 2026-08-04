@@ -1,6 +1,6 @@
 // Types alignés sur les modèles du backend OKKAZ (prisma/schema.prisma).
 
-export type UserRole = "BUYER" | "SELLER" | "SELLER_PRO" | "ADMIN";
+export type UserRole = "SELLER" | "SELLER_PRO" | "ADMIN";
 export type UserStatus = "ACTIVE" | "SUSPENDED" | "BLOCKED" | "PENDING_KYC";
 export type KycStatus = "NONE" | "PENDING" | "APPROVED" | "REJECTED";
 export type KycDocumentType = "ID_CARD" | "PASSPORT" | "DRIVER_LICENSE";

@@ -46,7 +46,7 @@ export async function detail(req: Request, res: Response): Promise<Response> {
  * Enregistre la consultation et renvoie le numéro réel de l'annonceur s'il est
  * abonné, sinon le numéro intermédiaire de la plateforme.
  *
- * @param req - Param `:id` (UUID). Requiert `req.user` (BUYER).
+ * @param req - Param `:id` (UUID). Requiert un compte connecté.
  * @param res - 200 OK avec `{ contactPhone, isOwnerNumber, watermark }`.
  */
 export async function revealContact(req: Request, res: Response): Promise<Response> {

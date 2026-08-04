@@ -14,7 +14,7 @@
  * Comptes de démo (mêmes identifiants que le vrai seed) :
  *   admin@okkaz.bj        / Admin@OKKAZ2026   (ADMIN)
  *   seller.demo@okkaz.bj  / Seller@2026       (SELLER, KYC approuvé)
- *   buyer.demo@okkaz.bj   / Buyer@2026        (BUYER)
+ *   member.demo@okkaz.bj  / Member@2026       (SELLER sans KYC)
  */
 
 import http from "node:http";
@@ -55,7 +55,7 @@ function addUser(data) {
     password: data.password, // en clair : c'est un mock
     firstName: data.firstName,
     lastName: data.lastName,
-    role: data.role ?? "BUYER",
+    role: data.role ?? "SELLER",
     status: data.status ?? "ACTIVE",
     kycStatus: data.kycStatus ?? "NONE",
     isEmailVerified: true,
@@ -81,8 +81,8 @@ const seller = addUser({
   city: "Cotonou", createdAt: daysAgo(30),
 });
 const buyer = addUser({
-  email: "buyer.demo@okkaz.bj", phone: "+22997000002", password: "Buyer@2026",
-  firstName: "Jean", lastName: "Hounsou", role: "BUYER", city: "Porto-Novo",
+  email: "member.demo@okkaz.bj", phone: "+22997000002", password: "Member@2026",
+  firstName: "Jean", lastName: "Hounsou", role: "SELLER", city: "Porto-Novo",
   createdAt: daysAgo(20),
 });
 
@@ -282,7 +282,7 @@ route("POST", "auth/register", (ctx) => {
   const user = addUser({
     email: String(b.email).toLowerCase(), phone: b.phone, password: b.password,
     firstName: b.firstName, lastName: b.lastName,
-    role: b.role === "SELLER" ? "SELLER" : "BUYER",
+    role: "SELLER",
     status: b.role === "SELLER" ? "PENDING_KYC" : "ACTIVE",
   });
   created(ctx.res, { user: publicUser(user), tokens: issueTokens(user) }, "Inscription réussie. Vérifiez votre email.");
@@ -326,7 +326,7 @@ route("POST", "auth/oauth/google", (ctx) => {
   if (!user) {
     user = addUser({
       email: "google.user@okkaz.bj", phone: null, password: null,
-      firstName: "Awa", lastName: "Google", role: "BUYER", city: "Cotonou",
+      firstName: "Awa", lastName: "Google", role: "SELLER", city: "Cotonou",
     });
     user.googleId = "mock-google-sub";
   }
@@ -358,12 +358,6 @@ route("PATCH", "users/me/password", (ctx) => {
   user.password = ctx.body.newPassword;
   ok(ctx.res, null, "Mot de passe modifié. Reconnectez-vous.");
 });
-route("POST", "users/me/become-seller", (ctx) => {
-  const user = requireAuth(ctx.req, ctx.res, ["BUYER"]); if (!user) return;
-  user.role = "SELLER";
-  if (user.kycStatus !== "APPROVED") user.status = "PENDING_KYC";
-  ok(ctx.res, { user: publicUser(user) }, "Mode vendeur activé. Vérifiez votre identité (KYC) pour publier.");
-});
 route("GET", "users/me/listings", (ctx) => {
   const user = requireAuth(ctx.req, ctx.res, ["SELLER", "SELLER_PRO"]); if (!user) return;
   const items = db.listings
@@ -373,7 +367,7 @@ route("GET", "users/me/listings", (ctx) => {
   paginate(ctx.res, items, ctx.query);
 });
 route("GET", "users/me/contact-reveals", (ctx) => {
-  const user = requireAuth(ctx.req, ctx.res, ["BUYER", "SELLER", "SELLER_PRO"]); if (!user) return;
+  const user = requireAuth(ctx.req, ctx.res, ["SELLER", "SELLER_PRO", "ADMIN"]); if (!user) return;
   const items = db.contactReveals
     .filter((r) => r.userId === user.id)
     .map((r) => ({ ...r, listing: listingView(db.listings.find((l) => l.id === r.listingId)) }));
@@ -505,7 +499,7 @@ route("GET", "listings/:id", (ctx) => {
   ok(ctx.res, { listing: listingView(listing) });
 });
 route("POST", "listings/:id/contact", (ctx) => {
-  const user = requireAuth(ctx.req, ctx.res, ["BUYER", "SELLER", "SELLER_PRO"]); if (!user) return;
+  const user = requireAuth(ctx.req, ctx.res, ["SELLER", "SELLER_PRO", "ADMIN"]); if (!user) return;
   const listing = db.listings.find((l) => l.id === ctx.params.id);
   if (!listing) return fail(ctx.res, 404, "RECORD_NOT_FOUND", "Annonce introuvable.");
   const isPro = hasActiveSubscription(listing.userId);
@@ -607,7 +601,7 @@ route("PATCH", "listings/:id/resume", (ctx) => {
 
 /* ── Reviews ── */
 route("POST", "reviews", (ctx) => {
-  const user = requireAuth(ctx.req, ctx.res, ["BUYER", "SELLER", "SELLER_PRO"]); if (!user) return;
+  const user = requireAuth(ctx.req, ctx.res, ["SELLER", "SELLER_PRO", "ADMIN"]); if (!user) return;
   const { listingId, rating, comment } = ctx.body ?? {};
   const listing = db.listings.find((l) => l.id === listingId);
   if (!listing) return fail(ctx.res, 404, "RECORD_NOT_FOUND", "Annonce introuvable.");
@@ -649,7 +643,7 @@ route("DELETE", "reviews/:id", (ctx) => {
 
 /* ── Reports ── */
 route("POST", "reports", (ctx) => {
-  const user = requireAuth(ctx.req, ctx.res, ["BUYER", "SELLER", "SELLER_PRO"]); if (!user) return;
+  const user = requireAuth(ctx.req, ctx.res, ["SELLER", "SELLER_PRO", "ADMIN"]); if (!user) return;
   const report = {
     id: uuid(), reporterId: user.id, reportedUserId: ctx.body?.reportedUserId ?? null,
     listingId: ctx.body?.listingId ?? null, reason: ctx.body?.reason ?? "OTHER",
@@ -726,7 +720,7 @@ route("POST", "subscriptions/cancel", (ctx) => {
 
 /* ── Demands ── */
 route("POST", "demands/initiate", (ctx) => {
-  const user = requireAuth(ctx.req, ctx.res, ["BUYER", "SELLER", "SELLER_PRO"]); if (!user) return;
+  const user = requireAuth(ctx.req, ctx.res, ["SELLER", "SELLER_PRO", "ADMIN"]); if (!user) return;
   const b = ctx.body ?? {};
   const type = b.type === "EXPRESS" ? "EXPRESS" : "STANDARD";
   const amount = type === "STANDARD" ? 2500 : Math.max(5000, Math.round((Number(b.propertyValue) || 0) * 0.03));
@@ -758,11 +752,11 @@ route("GET", "demands/standard", (ctx) => {
   paginate(ctx.res, db.demands.filter((d) => d.status === "ACTIVE" && d.type === "STANDARD"), ctx.query);
 });
 route("GET", "demands/me", (ctx) => {
-  const user = requireAuth(ctx.req, ctx.res, ["BUYER", "SELLER", "SELLER_PRO"]); if (!user) return;
+  const user = requireAuth(ctx.req, ctx.res, ["SELLER", "SELLER_PRO", "ADMIN"]); if (!user) return;
   paginate(ctx.res, db.demands.filter((d) => d.userId === user.id), ctx.query);
 });
 route("PATCH", "demands/:id/close", (ctx) => {
-  const user = requireAuth(ctx.req, ctx.res, ["BUYER", "SELLER", "SELLER_PRO", "ADMIN"]); if (!user) return;
+  const user = requireAuth(ctx.req, ctx.res, ["SELLER", "SELLER_PRO", "ADMIN"]); if (!user) return;
   const demand = db.demands.find((d) => d.id === ctx.params.id);
   if (!demand) return fail(ctx.res, 404, "RECORD_NOT_FOUND", "Demande introuvable.");
   if (user.role !== "ADMIN" && demand.userId !== user.id) {

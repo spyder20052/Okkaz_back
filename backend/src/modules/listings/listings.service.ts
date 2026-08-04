@@ -414,7 +414,7 @@ export async function getDetail(listingId: string) {
  * — elle conditionne la possibilité de laisser un avis (cf. reviews.service).
  * La première consultation incrémente `contactsCount`.
  *
- * @param userId    - ID du locataire (BUYER) qui consulte.
+ * @param userId    - ID du membre qui consulte.
  * @param listingId - UUID de l'annonce.
  * @returns `{ contactPhone, isOwnerNumber, watermark }`.
  * @throws {AppError} 404 si l'annonce est introuvable/inactive.

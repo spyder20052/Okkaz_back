@@ -26,7 +26,6 @@ datasource db {
 // -----------------------------------------------------------------------------
 
 enum UserRole {
-  BUYER
   SELLER
   SELLER_PRO
   ADMIN
@@ -145,7 +144,7 @@ model User {
   googleId                 String?    @unique @map("google_id") @db.VarChar(64)
   firstName                String     @map("first_name") @db.VarChar(100)
   lastName                 String     @map("last_name") @db.VarChar(100)
-  role                     UserRole   @default(BUYER)
+  role                     UserRole   @default(SELLER)
   status                   UserStatus @default(ACTIVE)
   kycStatus                KycStatus  @default(NONE) @map("kyc_status")
   profilePhotoUrl          String?    @map("profile_photo_url") @db.VarChar(500)

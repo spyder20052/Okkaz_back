@@ -17,7 +17,7 @@ const router = Router();
 router.post(
   '/upload',
   authenticate,
-  authorize('SELLER', 'SELLER_PRO'),
+  authorize('SELLER', 'SELLER_PRO', 'ADMIN'),
   upload.fields([
     { name: 'front_file', maxCount: 1 },
     { name: 'back_file', maxCount: 1 },
@@ -26,7 +26,7 @@ router.post(
   asyncHandler(controller.upload),
 );
 
-router.get('/status', authenticate, authorize('SELLER', 'SELLER_PRO'), asyncHandler(controller.myStatus));
+router.get('/status', authenticate, authorize('SELLER', 'SELLER_PRO', 'ADMIN'), asyncHandler(controller.myStatus));
 
 router.get(
   '/admin/list',

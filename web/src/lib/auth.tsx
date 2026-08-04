@@ -21,7 +21,6 @@ interface RegisterInput {
   email: string;
   phone: string;
   password: string;
-  role: "BUYER" | "SELLER";
 }
 
 interface AuthContextValue {
@@ -31,7 +30,6 @@ interface AuthContextValue {
   register: (input: RegisterInput) => Promise<ApiUser>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
-  becomeSeller: () => Promise<ApiUser>;
   loginWithGoogle: (idToken: string) => Promise<ApiUser>;
 }
 
@@ -111,31 +109,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return res.data.user;
   }, []);
 
-  const becomeSeller = useCallback(async () => {
-    const res = await api.post<{ user: ApiUser }>("/users/me/become-seller");
-    // Le rôle est encodé dans l'access token (15 min) : on force une rotation
-    // pour que les routes vendeur acceptent immédiatement le nouveau rôle.
-    const stored = readAuth();
-    let tokens = stored?.tokens ?? null;
-    if (stored) {
-      try {
-        const refreshed = await api.post<{ accessToken: string; refreshToken: string }>(
-          "/auth/refresh-token",
-          { refreshToken: stored.tokens.refreshToken },
-          false,
-        );
-        tokens = refreshed.data;
-      } catch {
-        // À défaut, l'ancien token reste utilisable après son expiration naturelle.
-      }
-      writeAuth({ user: res.data.user, tokens: tokens! });
-    }
-    return res.data.user;
-  }, []);
-
   return (
     <AuthContext.Provider
-      value={{ user, isLoading, login, register, logout, refreshUser, becomeSeller, loginWithGoogle }}
+      value={{ user, isLoading, login, register, logout, refreshUser, loginWithGoogle }}
     >
       {children}
     </AuthContext.Provider>

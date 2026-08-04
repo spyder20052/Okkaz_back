@@ -30,7 +30,7 @@ describe('Demands Routes Integration Tests', () => {
         firstName: 'Buyer',
         lastName: 'Test',
         phone: '1122334455',
-        role: UserRole.BUYER,
+        role: UserRole.SELLER,
         isEmailVerified: true,
       },
     });
@@ -241,7 +241,7 @@ describe('Demands Routes Integration Tests', () => {
           firstName: 'Buyer2',
           lastName: 'Test',
           phone: '1122334459',
-          role: UserRole.BUYER,
+          role: UserRole.SELLER,
           isEmailVerified: true,
         },
       });

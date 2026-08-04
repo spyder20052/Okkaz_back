@@ -23,9 +23,9 @@ Le frontend livré était **100 % statique** : aucune requête réseau, aucune a
 
 ### Pages branchées (page → endpoints)
 **Public**
-- `/connexion` — refonte complète : login (email **ou** téléphone + mot de passe) et inscription (rôle « Je cherche à louer » = BUYER / « Je veux publier » = SELLER) → `POST /auth/login`, `POST /auth/register`. Redirection selon rôle (ADMIN→/admin, SELLER→/vendeur, BUYER→/annonces).
+- `/connexion` — login (email **ou** téléphone + mot de passe) et inscription avec attribution automatique du rôle SELLER → `POST /auth/login`, `POST /auth/register`. Tous les comptes peuvent consulter et contacter ; le KYC est requis uniquement pour publier.
 - `/annonces` — `GET /listings` (recherche débouncée `q`, chips catégories depuis `GET /categories`, filtre LOA, tri, pagination) ; le param `?category=<slug>` de la home est interprété.
-- `/annonces/[id]` — `GET /listings/:id`, galerie photos réelles, contact vendeur (`POST /listings/:id/contact` pour les BUYER connectés → numéro + lien WhatsApp), avis (`GET /reviews/listing/:id` + formulaire `POST /reviews` avec étoiles fonctionnelles), signalement (`POST /reports`), annonces similaires.
+- `/annonces/[id]` — `GET /listings/:id`, galerie photos réelles, contact vendeur (`POST /listings/:id/contact` pour tout compte connecté → numéro + lien WhatsApp), avis, signalement et annonces similaires.
 - Landing — la section annonces charge `GET /listings/featured` (fallback : récentes) ; les CTA « propriétaire » qui pointaient par erreur vers `/admin` pointent vers `/vendeur` ; Navbar sensible à l'auth (MON ESPACE / DÉCONNEXION).
 
 **Espace vendeur** (garde d'accès : SELLER/SELLER_PRO/ADMIN, sinon redirect /connexion)
@@ -98,7 +98,7 @@ Côté backend, `FRONTEND_URL` accepte **plusieurs origines séparées par des v
 |---|---|---|
 | Admin | ADMIN | `admin@okkaz.bj` / `Admin@OKKAZ2026` |
 | Vendeur (KYC approuvé, 4 annonces actives) | SELLER | `seller.demo@okkaz.bj` / `Seller@2026` |
-| Acheteur | BUYER | `buyer.demo@okkaz.bj` / `Buyer@2026` |
+| Membre standard | SELLER sans KYC | `member.demo@okkaz.bj` / `Member@2026` |
 
 Pour tester les parcours au fur et à mesure : se connecter en acheteur pour consulter contacts/avis, en vendeur pour publier (les annonces partent en PENDING), puis en admin (`/admin/annonces`) pour les valider. Swagger complet sur `http://localhost:3000/api/v1/docs`.
 
@@ -110,7 +110,7 @@ Pour tester les parcours au fur et à mesure : se connecter en acheteur pour con
 
 ### A. Divergences produit MAJEURES (à trancher ensemble)
 
-**1. ~~« Je recherche » réservé au rôle BUYER~~ — ✅ RÉSOLU (18 juil. 2026).**
+**1. ~~« Je recherche » réservé à un rôle distinct~~ — ✅ RÉSOLU.**
 `POST /listings/:id/contact` et `POST /demands/initiate` (+ `GET /demands/me`, `PATCH /demands/:id/close`) sont désormais ouverts aux rôles SELLER/SELLER_PRO : un vendeur peut agir comme consommateur, conformément au cahier des charges (« création de compte obligatoire pour toute action »). Cas particulier géré : le propriétaire qui consulte le contact de **sa propre annonce** reçoit son vrai numéro déchiffré, sans traçage de consultation (ne fausse pas les stats, n'ouvre pas le droit à un avis).
 
 **2. L'option « Numéro direct +2 500 FCFA » par annonce n'existe pas.**
@@ -123,7 +123,7 @@ Seul l'abonnement Premium (`isFeatured=true` sur **toutes** les annonces du vend
 Le flux par défaut de `/paiement` (payer une location avec caution, dates, etc.) n'a **aucun** équivalent backend : pas de modèle Booking, pas de calendrier, pas de paiement de location. L'UI affiche « non disponible ». *Gros morceau produit à cadrer si nécessaire (cahier des charges le mentionne).*
 
 **5. ~~Pas d'OAuth Google/Apple~~ — ✅ Google RÉSOLU (19 juil. 2026), Apple en attente.**
-`POST /auth/oauth/google` est implémenté : le front envoie l'ID token Google Identity Services, le backend le vérifie (audience + signature via l'endpoint officiel Google), crée un compte BUYER actif au premier login (sans téléphone ni mot de passe — schéma migré) ou lie le compte Google à un compte existant portant le même email. Il reste à créer un **Client ID OAuth** sur console.cloud.google.com et à le renseigner dans `GOOGLE_CLIENT_ID` (backend) + `NEXT_PUBLIC_GOOGLE_CLIENT_ID` (front) — sans quoi le bouton front passe en mode simulation et le serveur répond 503 `OAUTH_NOT_CONFIGURED`. **Sign in with Apple reste non implémenté** : il exige un compte Apple Developer payant (99 $/an, Services ID + clé privée) — décision à prendre avant tout développement.
+`POST /auth/oauth/google` est implémenté : le front envoie l'ID token Google Identity Services, le backend le vérifie (audience + signature via l'endpoint officiel Google), crée un compte SELLER actif au premier login (sans téléphone ni mot de passe — schéma migré) ou lie le compte Google à un compte existant portant le même email. Il reste à créer un **Client ID OAuth** sur console.cloud.google.com et à le renseigner dans `GOOGLE_CLIENT_ID` (backend) + `NEXT_PUBLIC_GOOGLE_CLIENT_ID` (front) — sans quoi le bouton front passe en mode simulation et le serveur répond 503 `OAUTH_NOT_CONFIGURED`. **Sign in with Apple reste non implémenté** : il exige un compte Apple Developer payant (99 $/an, Services ID + clé privée) — décision à prendre avant tout développement.
 
 ### B. Fonctionnalités front sans aucun backend (UI présente, API absente)
 
@@ -151,7 +151,7 @@ Le flux par défaut de `/paiement` (payer une location avec caution, dates, etc.
 | 20 | `GET /auth/verify-email/:token` | Page de confirmation d'email (le lien du mail pointe actuellement vers l'API brute) |
 | 21 | `GET /demands`, `GET /demands/standard`, `GET /demands/:id`, `PATCH /demands/:id/close` | **Liste des demandes « Je recherche » pour que les vendeurs y répondent** (les EXPRESS sont réservées aux SELLER_PRO) — c'est le cœur du produit demandes, aucune page ne l'affiche |
 | 22 | `GET /users/:id/public` | Page profil public d'un vendeur (note moyenne, annonces actives) |
-| 23 | `GET /users/me/contact-reveals` (ouvert à BUYER/SELLER/SELLER_PRO depuis le 19 juil.), `GET /users/me/payments` | Espace acheteur : historique des contacts consultés et des paiements |
+| 23 | `GET /users/me/contact-reveals` (ouvert à SELLER/SELLER_PRO/ADMIN), `GET /users/me/payments` | Historique des contacts consultés et des paiements |
 | 24 | `PATCH /reviews/:id/moderate`, `DELETE /reviews/:id` | UI admin de modération des avis (note visible ajoutée sur /admin/moderation) |
 | 25 | Filtres API non exposés : `city`, `minPrice`/`maxPrice` sur /listings ; `method`, `dateFrom/dateTo` sur /admin/payments ; `kycStatus` sur /admin/users | Ajouter les contrôles UI correspondants (facile) |
 
@@ -185,7 +185,7 @@ Autres détails :
 
 ## 4. Récapitulatif des priorités proposées
 
-**À trancher produit (bloquant pour la cohérence)** : n°2 (numéro direct), n°3 (boost), n°4 (réservation). Le n°1 (demandes BUYER vs vendeur) est résolu : routes ouvertes aux vendeurs.
+**À trancher produit (bloquant pour la cohérence)** : n°2 (numéro direct), n°3 (boost), n°4 (réservation). Le n°1 est résolu : toutes les capacités de consultation sont ouvertes aux trois rôles existants.
 
 **Côté front (rapide, API déjà prête)** : n°19-20 (mot de passe oublié / vérif email), n°21 (liste des demandes pour vendeurs — cœur du produit), n°22-23 (profil public, espace acheteur), n°24 (modération avis), n°25 (filtres).
 

@@ -17,7 +17,7 @@ import { AppError } from "../utils/AppError";
  * Factory de middleware qui autorise uniquement les utilisateurs dont le rôle
  * figure dans la liste des rôles passés en paramètre.
  *
- * @param roles - Liste des rôles autorisés (ex : `'ADMIN'`, `'SELLER'`, `'BUYER'`).
+ * @param roles - Liste des rôles autorisés (ex : `'ADMIN'`, `'SELLER_PRO'`, `'SELLER'`).
  * @returns Middleware Express qui bloque avec une 403 si le rôle ne correspond pas.
  *
  * @example

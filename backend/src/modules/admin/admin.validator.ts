@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 export const listUsersQuerySchema = z.object({
-  role: z.enum(['BUYER', 'SELLER', 'SELLER_PRO', 'ADMIN']).optional(),
+  role: z.enum(['SELLER', 'SELLER_PRO', 'ADMIN']).optional(),
   status: z.enum(['ACTIVE', 'SUSPENDED', 'BLOCKED', 'PENDING_KYC']).optional(),
   kycStatus: z.enum(['NONE', 'PENDING', 'APPROVED', 'REJECTED']).optional(),
   q: z.string().max(100).optional(),
@@ -15,7 +15,7 @@ export const settingKeyParamSchema = z.object({ key: z.string().min(1).max(100) 
 
 export const reasonBodySchema = z.object({ reason: z.string().min(3).max(500) });
 export const rejectionBodySchema = z.object({ rejectionReason: z.string().min(3).max(500) });
-export const updateRoleSchema = z.object({ role: z.enum(['BUYER', 'SELLER', 'SELLER_PRO', 'ADMIN']) });
+export const updateRoleSchema = z.object({ role: z.enum(['SELLER', 'SELLER_PRO', 'ADMIN']) });
 export const updateSettingSchema = z.object({ value: z.string().min(1).max(2000) });
 
 export const listAdminListingsQuerySchema = z.object({

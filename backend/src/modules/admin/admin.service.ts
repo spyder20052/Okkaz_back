@@ -120,7 +120,7 @@ export async function setUserStatus(id: string, status: UserStatus, _reason?: st
  * Met à jour le rôle d'un utilisateur.
  *
  * @param id   - UUID de l'utilisateur.
- * @param role - Nouveau rôle (BUYER, SELLER, SELLER_PRO, ADMIN).
+ * @param role - Nouveau rôle (SELLER, SELLER_PRO, ADMIN).
  * @returns L'utilisateur mis à jour.
  * @throws {AppError} 404 si introuvable.
  */

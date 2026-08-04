@@ -59,7 +59,7 @@ Query `page` (défaut 1) et `limit` (défaut 20, max 100) sur toutes les routes 
 200 req / 15 min / IP en global ; **10 req / 15 min / IP sur `/auth/*`** (login, register, forgot-password) — attention en dev, réutiliser les tokens.
 
 ### Rôles
-`BUYER` (acheteur) · `SELLER` (vendeur gratuit) · `SELLER_PRO` (vendeur Premium — attribué automatiquement après paiement d'un abonnement) · `ADMIN`.
+`SELLER` (compte standard) · `SELLER_PRO` (compte Premium — attribué automatiquement après paiement d'un abonnement) · `ADMIN`. Tous peuvent consulter et contacter.
 
 ### Fichiers / images
 Upload en `multipart/form-data`, images `jpeg/png/webp`, **5 Mo max**. Les URLs renvoyées sont relatives (`/uploads/...`) → préfixer par l'origine de l'API (helper `mediaUrl()` de `web/src/lib/api.ts`).
@@ -70,7 +70,7 @@ Upload en `multipart/form-data`, images `jpeg/png/webp`, **5 Mo max**. Les URLs 
 
 | Méthode & chemin | Auth | Corps | Réponse `data` |
 |---|---|---|---|
-| `POST /auth/register` | — | `{ firstName (2-100), lastName (2-100), email, phone (^\+?\d{8,15}$), password (8-128, ≥1 maj + 1 min + 1 chiffre), role: "BUYER"\|"SELLER" }` | `{ user, tokens: { accessToken, refreshToken } }` |
+| `POST /auth/register` | — | `{ firstName (2-100), lastName (2-100), email, phone (^\+?\d{8,15}$), password (8-128, ≥1 maj + 1 min + 1 chiffre) }` | `{ user (rôle SELLER), tokens: { accessToken, refreshToken } }` |
 | `POST /auth/login` | — | `{ email? , phone?, password }` (email **ou** phone) | `{ user, tokens }` |
 | `POST /auth/refresh-token` | — | `{ refreshToken }` | `{ accessToken, refreshToken }` |
 | `POST /auth/logout` | Bearer | `{ refreshToken }` (requis) | `null` |
@@ -89,9 +89,8 @@ Objet `user` : `{ id, email, phone, firstName, lastName, role, status, kycStatus
 | `GET /users/me` | Bearer | — | `{ user }` (+ `city`, `address`, `profilePhotoUrl`, `reportsCount`, `lastLoginAt`, `createdAt`) |
 | `PATCH /users/me` | Bearer | `{ firstName?, lastName?, city? (≤100), address? (≤500), profilePhotoUrl? (URL) }` | `{ user }` — email/téléphone **non modifiables** |
 | `PATCH /users/me/password` | Bearer | `{ currentPassword, newPassword }` | `null` — **déconnecte toutes les sessions** |
-| `POST /users/me/become-seller` | BUYER | — | `{ user }` — active le mode vendeur (role SELLER, status PENDING_KYC : KYC requis avant publication). ⚠️ Le rôle est encodé dans l'access token : appeler ensuite `POST /auth/refresh-token` pour un token à jour (géré par `useAuth().becomeSeller()`) |
 | `GET /users/me/listings` | SELLER, SELLER_PRO | paginé | annonces du vendeur, **tous statuts**, avec photo de couverture + catégorie |
-| `GET /users/me/contact-reveals` | BUYER | paginé | historique des contacts consultés (+ annonce) |
+| `GET /users/me/contact-reveals` | Connecté | paginé | historique des contacts consultés (+ annonce) |
 | `GET /users/me/payments` | Bearer | paginé | paiements de l'utilisateur |
 | `GET /users/:id/public` | — | — | `{ profile }` : `{ id, firstName, lastName, role, profilePhotoUrl, city, createdAt, ratingAverage, ratingCount, activeListings (≤20) }` |
 
@@ -124,7 +123,7 @@ Slugs seedés : `automobiles`, `electromenager`, `electronique`, `immobilier`, `
 | `GET /listings` | — | `?q= (≤100) &categoryId= &city= &minPrice= &maxPrice= &isLoa= &sort=recent\|price_asc\|price_desc\|featured &page=&limit=` (paginé) | annonces ACTIVE (cover uniquement, jamais le téléphone) |
 | `GET /listings/featured` | — | — | `{ items }` (≤20 annonces en vedette) |
 | `GET /listings/:id` | — | — | `{ listing }` — incrémente le compteur de vues ; `contactPhoneDisplayed` = numéro **plateforme**, jamais le vrai |
-| `POST /listings/:id/contact` | **BUYER** | — | `{ contactPhone, isOwnerNumber, watermark }` — vrai numéro si le vendeur est Premium, sinon numéro de mise en relation |
+| `POST /listings/:id/contact` | Connecté | — | `{ contactPhone, isOwnerNumber, watermark }` — vrai numéro si le vendeur est Premium, sinon numéro de mise en relation |
 | `POST /listings` | SELLER, SELLER_PRO | voir ci-dessous | `{ listing }` — créée en statut **PENDING** (validation admin) ; 403 `KYC_NOT_APPROVED` sinon |
 | `PATCH /listings/:id` | propriétaire (ou ADMIN) | partiel du corps de création | `{ listing }` — ⚠️ repasse en PENDING |
 | `DELETE /listings/:id` | propriétaire (ou ADMIN) | — | 204 (soft delete) |
@@ -158,7 +157,7 @@ Slugs seedés : `automobiles`, `electromenager`, `electronique`, `immobilier`, `
 
 | Méthode & chemin | Auth | Corps | Réponse `data` |
 |---|---|---|---|
-| `POST /reviews` | BUYER, SELLER, SELLER_PRO | `{ listingId, rating (1-5), comment? (≤2000) }` | `{ review }` |
+| `POST /reviews` | Connecté | `{ listingId, rating (1-5), comment? (≤2000) }` | `{ review }` |
 | `GET /reviews/listing/:listing_id` | — | — | `{ reviews, stats: { average, count } }` (avis modérés exclus) |
 | `PATCH /reviews/:id/moderate` | ADMIN | `{ isModerated: bool }` | `{ review }` |
 | `DELETE /reviews/:id` | ADMIN | — | 204 |
@@ -169,7 +168,7 @@ Règles : contact consulté au préalable (`NO_CONTACT_REVEAL`), délai 24 h (`R
 
 | Méthode & chemin | Auth | Corps / Query | Réponse `data` |
 |---|---|---|---|
-| `POST /reports` | BUYER, SELLER, SELLER_PRO | `{ reportedUserId? \| listingId?, reason: FRAUD\|WRONG_INFO\|INAPPROPRIATE\|NO_RESPONSE\|OTHER, description? (≤2000) }` — au moins un des deux ids | `{ report }` |
+| `POST /reports` | Connecté | `{ reportedUserId? \| listingId?, reason: FRAUD\|WRONG_INFO\|INAPPROPRIATE\|NO_RESPONSE\|OTHER, description? (≤2000) }` — au moins un des deux ids | `{ report }` |
 | `GET /reports/admin/list` | ADMIN | `?status=OPEN\|REVIEWED\|CLOSED` (paginé) | reports + reporter/cible/annonce |
 | `GET /reports/admin/:id` | ADMIN | — | `{ report }` |
 | `PATCH /reports/admin/:id/review` | ADMIN | `{ status: "REVIEWED"\|"CLOSED", adminNote? }` | `{ report }` |
@@ -191,12 +190,12 @@ Après paiement confirmé (webhook) : l'utilisateur devient `SELLER_PRO`, toutes
 
 | Méthode & chemin | Auth | Corps | Réponse `data` |
 |---|---|---|---|
-| `POST /demands/initiate` | **BUYER uniquement** ⚠️ | `{ categoryId, title (5-255), description (10-5000), maxBudget?, city (2-100), type: "STANDARD"\|"EXPRESS", propertyValue? (pour EXPRESS), method: "MOBILE_MONEY"\|"CARD" }` | `{ demand, payment: { id, amount, currency, providerRef } }` — STANDARD 2 500 F, EXPRESS max(5 000, 3 % de propertyValue) |
+| `POST /demands/initiate` | Connecté | `{ categoryId, title (5-255), description (10-5000), maxBudget?, city (2-100), type: "STANDARD"\|"EXPRESS", propertyValue? (pour EXPRESS), method: "MOBILE_MONEY"\|"CARD" }` | `{ demand, payment: { id, amount, currency, providerRef } }` — STANDARD 2 500 F, EXPRESS max(5 000, 3 % de propertyValue) |
 | `GET /demands` | SELLER_PRO | paginé | demandes actives (STANDARD + EXPRESS) |
 | `GET /demands/standard` | SELLER, SELLER_PRO | paginé | demandes STANDARD actives |
-| `GET /demands/me` | BUYER | paginé | mes demandes |
+| `GET /demands/me` | Connecté | paginé | mes demandes |
 | `GET /demands/:id` | SELLER, SELLER_PRO, ADMIN | — | `{ demand }` — EXPRESS : 403 `EXPRESS_PRO_ONLY` si non Premium |
-| `PATCH /demands/:id/close` | BUYER (owner), ADMIN | — | `{ demand }` |
+| `PATCH /demands/:id/close` | Propriétaire, ADMIN | — | `{ demand }` |
 
 La demande devient ACTIVE **après confirmation du paiement** (webhook).
 

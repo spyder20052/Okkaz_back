@@ -4,7 +4,7 @@
  */
 
 import bcrypt from 'bcrypt';
-import { KycStatus, ListingStatus, UserRole, UserStatus } from '@prisma/client';
+import { ListingStatus, UserStatus } from '@prisma/client';
 import { prisma } from '../../config/prisma';
 import { AppError } from '../../utils/AppError';
 import { parsePagination, buildPaginationMeta } from '../../utils/pagination';
@@ -55,35 +55,6 @@ export async function updateMe(
   return prisma.user.update({
     where: { id: userId },
     data,
-    select: PUBLIC_USER_SELECT,
-  });
-}
-
-/**
- * Active le mode vendeur sur un compte acheteur.
- *
- * Un BUYER peut devenir SELLER en libre-service : il devra ensuite passer
- * la vérification d'identité (KYC) avant de pouvoir publier, exactement
- * comme un vendeur inscrit directement. Les autres rôles sont refusés.
- *
- * @param userId - ID de l'utilisateur.
- * @returns Le profil mis à jour (role SELLER, status PENDING_KYC).
- * @throws {AppError} 404 si l'utilisateur n'existe pas.
- * @throws {AppError} 409 si le compte est déjà vendeur (ou admin).
- */
-export async function becomeSeller(userId: string) {
-  const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, role: true, kycStatus: true } });
-  if (!user) throw AppError.notFound('USER_NOT_FOUND', 'Utilisateur introuvable.');
-  if (user.role !== UserRole.BUYER) {
-    throw AppError.conflict('ALREADY_SELLER', 'Ce compte peut déjà publier des annonces.');
-  }
-  return prisma.user.update({
-    where: { id: userId },
-    data: {
-      role: UserRole.SELLER,
-      // Même parcours qu'une inscription vendeur : KYC requis avant publication.
-      ...(user.kycStatus !== KycStatus.APPROVED ? { status: UserStatus.PENDING_KYC } : {}),
-    },
     select: PUBLIC_USER_SELECT,
   });
 }

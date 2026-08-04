@@ -23,7 +23,7 @@ beforeAll(async () => {
       passwordHash,
       firstName: 'Buyer',
       lastName: 'One',
-      role: 'BUYER',
+      role: 'SELLER',
       status: 'ACTIVE',
     },
   });
@@ -76,7 +76,7 @@ describe('Users Routes (Integration)', () => {
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
       expect(res.body.data.user.email).toBe('buyer@example.com');
-      expect(res.body.data.user.role).toBe('BUYER');
+      expect(res.body.data.user.role).toBe('SELLER');
     });
   });
 
@@ -115,12 +115,13 @@ describe('Users Routes (Integration)', () => {
   });
 
   describe('RBAC Routes (Role-based access)', () => {
-    it('BUYER ne doit pas accéder aux listings SELLER', async () => {
+    it('tout compte standard doit accéder à ses listings', async () => {
       const res = await request(app)
         .get('/api/v1/users/me/listings')
         .set('Authorization', `Bearer ${validBuyerToken}`);
       
-      expect(res.status).toBe(403);
+      expect(res.status).toBe(200);
+      expect(Array.isArray(res.body.data)).toBe(true);
     });
 
     it('SELLER doit accéder aux listings', async () => {
@@ -141,7 +142,7 @@ describe('Users Routes (Integration)', () => {
       expect(Array.isArray(res.body.data)).toBe(true);
     });
 
-    it('BUYER doit accéder aux contact-reveals', async () => {
+    it('un second compte SELLER doit accéder aux contact-reveals', async () => {
       const res = await request(app)
         .get('/api/v1/users/me/contact-reveals')
         .set('Authorization', `Bearer ${validBuyerToken}`);

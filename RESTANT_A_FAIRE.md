@@ -11,6 +11,7 @@ Ce document suit les tâches restantes après l'intégration du frontend Next.js
 - Tests backend : 46 tests unitaires réussis
 - Frontend : typage, lint et build réussis
 - Backend : typage, lint et build réussis
+- Modèle des comptes : aucun rôle `BUYER`; tous les comptes sont `SELLER`, `SELLER_PRO` ou `ADMIN` et peuvent consulter/contacter
 
 ## Frontend — avancement
 
@@ -79,12 +80,12 @@ Ce document suit les tâches restantes après l'intégration du frontend Next.js
 
 ## Priorité 4 — Tests fonctionnels finaux
 
-- [ ] Tester l'inscription et la connexion d'un compte personnel.
-- [ ] Tester l'inscription et le KYC d'un vendeur.
+- [ ] Tester l'inscription et la connexion d'un compte standard (`SELLER`).
+- [ ] Tester le KYC d'un compte avant publication.
 - [ ] Tester la publication, la validation et l'affichage d'une annonce.
 - [ ] Vérifier qu'un vendeur non abonné affiche le numéro OKKAZ.
 - [ ] Vérifier qu'un vendeur abonné affiche automatiquement son numéro personnel.
-- [ ] Vérifier que BUYER, SELLER, SELLER_PRO et ADMIN peuvent consulter et contacter une annonce.
+- [ ] Vérifier que SELLER, SELLER_PRO et ADMIN peuvent consulter et contacter une annonce.
 - [ ] Tester le bouton WhatsApp avec les deux types de numéros.
 - [ ] Tester la création et le paiement d'une demande Standard.
 - [ ] Tester la création et le paiement d'une demande Express.
@@ -102,7 +103,8 @@ Ce document suit les tâches restantes après l'intégration du frontend Next.js
 - Les discussions se font directement sur WhatsApp.
 - Il n'existe pas de paiement de réservation ou de location sur le site.
 - Les seuls paiements sont l'abonnement vendeur et la publication d'une demande de bien.
-- Tous les rôles peuvent agir comme visiteurs intéressés, y compris les vendeurs et les administrateurs.
+- Il n'existe aucun rôle `BUYER` : acheter/consulter est une capacité commune à tous les comptes.
+- Les seuls rôles sont `SELLER`, `SELLER_PRO` et `ADMIN`.
 
 ## Commandes de validation
 

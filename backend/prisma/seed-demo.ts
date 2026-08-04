@@ -1,7 +1,7 @@
 /**
  * @module prisma/seed-demo
  * @description Peuple la base avec des données de DÉMONSTRATION pour le
- *   développement frontend : un vendeur KYC approuvé, un acheteur, et des
+ *   développement frontend : un vendeur KYC approuvé, un membre standard, et des
  *   annonces actives. Idempotent (relançable sans doublons).
  *
  * Prérequis : `npm run seed` (catégories, settings, admin).
@@ -9,7 +9,7 @@
  *
  * Comptes créés :
  *   - seller.demo@okkaz.bj / Seller@2026  (SELLER, KYC approuvé, annonces actives)
- *   - buyer.demo@okkaz.bj  / Buyer@2026   (BUYER)
+ *   - member.demo@okkaz.bj / Member@2026  (SELLER, sans KYC)
  *
  * @author KOUTON Spynel
  */
@@ -51,10 +51,10 @@ const SELLER = {
   city: "Cotonou",
 };
 
-const BUYER = {
-  email: "buyer.demo@okkaz.bj",
+const MEMBER = {
+  email: "member.demo@okkaz.bj",
   phone: "+22997000002",
-  password: "Buyer@2026",
+  password: "Member@2026",
   firstName: "Jean",
   lastName: "Hounsou",
   city: "Porto-Novo",
@@ -197,7 +197,7 @@ async function main(): Promise<void> {
   console.log("▶ Seeding demo data…");
   const sellerId = await upsertUser(SELLER, UserRole.SELLER, KycStatus.APPROVED);
   await ensureKycDocument(sellerId);
-  await upsertUser(BUYER, UserRole.BUYER, KycStatus.NONE);
+  await upsertUser(MEMBER, UserRole.SELLER, KycStatus.NONE);
   await seedListings(sellerId);
   // eslint-disable-next-line no-console
   console.log("✓ Demo seed complete.");

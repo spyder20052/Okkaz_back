@@ -38,7 +38,7 @@ describe('Admin Routes Integration Tests', () => {
         firstName: 'Buyer',
         lastName: 'BuyerTest',
         phone: '1122334455',
-        role: UserRole.BUYER,
+        role: UserRole.SELLER,
         isEmailVerified: true,
       },
     });

@@ -30,13 +30,13 @@ describe('Contact reveal & review reminder (Integration)', () => {
         passwordHash: 'hashed',
         firstName: 'Buyer',
         lastName: 'Reveal',
-        role: 'BUYER',
+        role: 'SELLER',
         status: 'ACTIVE',
         isEmailVerified: true,
       },
     });
     buyerId = buyer.id;
-    buyerToken = signAccessToken(buyer.id, 'BUYER');
+    buyerToken = signAccessToken(buyer.id, 'SELLER');
 
     const cat = await prisma.category.create({ data: { name: 'Reveal Cat', slug: 'reveal-cat' } });
 
@@ -205,10 +205,10 @@ describe('Contact reveal & review reminder (Integration)', () => {
   describe('Job de rappel d\'avis (runReviewReminders)', () => {
     it('relance une consultation ancienne sans avis, ignore une consultation récente', async () => {
       const old = await prisma.user.create({
-        data: { email: 'old-reveal@test.com', phone: '22930000004', passwordHash: 'h', firstName: 'Old', lastName: 'R', role: 'BUYER', isEmailVerified: true },
+        data: { email: 'old-reveal@test.com', phone: '22930000004', passwordHash: 'h', firstName: 'Old', lastName: 'R', role: 'SELLER', isEmailVerified: true },
       });
       const fresh = await prisma.user.create({
-        data: { email: 'fresh-reveal@test.com', phone: '22930000005', passwordHash: 'h', firstName: 'Fresh', lastName: 'R', role: 'BUYER', isEmailVerified: true },
+        data: { email: 'fresh-reveal@test.com', phone: '22930000005', passwordHash: 'h', firstName: 'Fresh', lastName: 'R', role: 'SELLER', isEmailVerified: true },
       });
 
       // Consultation ancienne (au-delà de review_reminder_delay_hours par défaut = 48h).

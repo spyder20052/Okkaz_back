@@ -8,7 +8,7 @@ import { formatPrice, type Demand } from "@/lib/types";
 import SellerShell from "../vendeur/SellerShell";
 import styles from "../vendeur/vendeur.module.css";
 
-const DEMAND_ROLES = ["BUYER", "SELLER", "SELLER_PRO", "ADMIN"];
+const DEMAND_ROLES = ["SELLER", "SELLER_PRO", "ADMIN"];
 
 const STATUS_LABELS: Record<string, string> = {
   ACTIVE: "Active",

@@ -24,7 +24,6 @@ const passwordSchema = z
  * @property email     - Adresse email (normalisée en lowercase).
  * @property phone     - Numéro de téléphone.
  * @property password  - Mot de passe (min 8, politique stricte).
- * @property role      - Rôle : `BUYER` (défaut) ou `SELLER`.
  */
 export const registerSchema = z.object({
   firstName: z.string().min(2).max(100),
@@ -32,7 +31,6 @@ export const registerSchema = z.object({
   email: z.string().email().max(255).toLowerCase(),
   phone: z.string().regex(phoneRegex, 'Numéro de téléphone invalide.'),
   password: passwordSchema,
-  role: z.enum(['BUYER', 'SELLER']).default('BUYER'),
 });
 
 /**

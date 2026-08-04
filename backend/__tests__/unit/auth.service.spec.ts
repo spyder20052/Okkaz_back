@@ -32,7 +32,6 @@ describe('Auth Service (Unit)', () => {
           password: 'Password123!',
           firstName: 'John',
           lastName: 'Doe',
-          role: 'BUYER',
         })
       ).rejects.toThrow(AppError);
       
@@ -41,7 +40,7 @@ describe('Auth Service (Unit)', () => {
       expect(prismaMock.user.create).not.toHaveBeenCalled();
     });
 
-    it('doit creer un utilisateur BUYER avec status ACTIVE', async () => {
+    it('doit creer un utilisateur SELLER actif sans exiger le KYC', async () => {
       prismaMock.user.findFirst.mockResolvedValue(null);
       (bcrypt.hash as jest.Mock).mockResolvedValue('hashedPassword');
       
@@ -51,7 +50,7 @@ describe('Auth Service (Unit)', () => {
         phone: '+229000000',
         firstName: 'John',
         lastName: 'Doe',
-        role: UserRole.BUYER,
+        role: UserRole.SELLER,
         status: UserStatus.ACTIVE,
         kycStatus: 'NONE',
         isEmailVerified: false,
@@ -66,11 +65,11 @@ describe('Auth Service (Unit)', () => {
         password: 'Password123!',
         firstName: 'John',
         lastName: 'Doe',
-        role: 'BUYER',
       });
 
       expect(prismaMock.user.create).toHaveBeenCalledWith(expect.objectContaining({
         data: expect.objectContaining({
+          role: UserRole.SELLER,
           status: UserStatus.ACTIVE,
         }),
       }));
@@ -92,7 +91,7 @@ describe('Auth Service (Unit)', () => {
         id: '123',
         email: 'test@test.com',
         passwordHash: 'hashed',
-        role: UserRole.BUYER,
+        role: UserRole.SELLER,
         status: UserStatus.ACTIVE,
       };
       prismaMock.user.findFirst.mockResolvedValue(mockUser as any);
@@ -132,7 +131,7 @@ describe('Auth Service (Unit)', () => {
         tokenHash: 'hash',
         expiresAt: new Date(Date.now() + 10000),
         revokedAt: null,
-        user: { status: UserStatus.ACTIVE, role: UserRole.BUYER } as any,
+        user: { status: UserStatus.ACTIVE, role: UserRole.SELLER } as any,
       } as any);
 
       const result = await authService.refresh('goodToken');

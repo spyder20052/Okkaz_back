@@ -18,7 +18,7 @@ Comptes utilisateurs (locataires, propriétaires, admins).
 | password_hash | VARCHAR(255) | NOT NULL | Bcrypt (12 rounds) |
 | first_name | VARCHAR(100) | NOT NULL | |
 | last_name | VARCHAR(100) | NOT NULL | |
-| role | ENUM | NOT NULL | BUYER / SELLER / SELLER_PRO / ADMIN |
+| role | ENUM | NOT NULL | SELLER / SELLER_PRO / ADMIN |
 | status | ENUM | NOT NULL | ACTIVE / SUSPENDED / BLOCKED / PENDING_KYC |
 | kyc_status | ENUM | NOT NULL | NONE / PENDING / APPROVED / REJECTED |
 | profile_photo_url | VARCHAR(500) | NULL | |
