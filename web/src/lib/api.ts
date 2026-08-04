@@ -103,6 +103,27 @@ async function tryRefreshTokens(): Promise<boolean> {
   return refreshPromise;
 }
 
+/**
+ * Après une rotation de token déclenchée par un changement de rôle, remet le
+ * profil stocké (localStorage + cookie middleware) en phase avec le serveur.
+ * Fire-and-forget : l'échec n'est pas bloquant, la prochaine page réessaiera.
+ */
+async function syncUserAfterRoleChange(): Promise<void> {
+  try {
+    const res = await apiFetch<{ success: boolean; data: { user: StoredAuth["user"] } }>(
+      "/users/me",
+      {},
+      true,
+    );
+    const stored = readAuth();
+    if (stored && res?.data?.user) {
+      writeAuth({ user: res.data.user, tokens: stored.tokens });
+    }
+  } catch {
+    // Silencieux : le self-heal de AuthProvider couvrira le prochain chargement.
+  }
+}
+
 interface RequestOptions {
   method?: "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
   body?: unknown;
@@ -152,6 +173,23 @@ export async function apiFetch<T = unknown>(
     if (res.status === 401 && auth && stored && !isRetry) {
       const refreshed = await tryRefreshTokens();
       if (refreshed) return apiFetch<T>(path, options, true);
+    }
+    // Rôle insuffisant : le rôle est encodé dans l'access token, qui peut
+    // être en retard sur la base (compte migré, passage Premium…). On fait
+    // tourner le token (le refresh relit le rôle en base) et on rejoue une
+    // fois ; si le refus persiste, c'est un vrai manque de droits.
+    if (
+      res.status === 403 &&
+      json?.error?.code === "INSUFFICIENT_ROLE" &&
+      auth &&
+      stored &&
+      !isRetry
+    ) {
+      const refreshed = await tryRefreshTokens();
+      if (refreshed) {
+        void syncUserAfterRoleChange();
+        return apiFetch<T>(path, options, true);
+      }
     }
     const err = json?.error ?? {};
     throw new ApiError(
