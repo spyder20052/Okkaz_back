@@ -125,7 +125,10 @@ export function createApp(): Application {
   );
 
   // ── Rate limiting global ─────────────────────────────────────────────────
-  app.use(globalLimiter);
+  // Limité au préfixe API : les fichiers statiques /uploads (photos
+  // d'annonces) ne doivent pas consommer le quota — une page de résultats
+  // charge des dizaines d'images.
+  app.use(env.API_PREFIX, globalLimiter);
 
   // ── Uploads locaux (dev) ─────────────────────────────────────────────────
   app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));
