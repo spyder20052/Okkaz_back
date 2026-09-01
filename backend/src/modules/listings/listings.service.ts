@@ -63,18 +63,43 @@ const publicListingInclude = {
 };
 
 /**
- * Sélection allégée pour les listes : inclut uniquement la photo de couverture
- * pour optimiser les performances.
+ * Sélection allégée pour les listes : n'inclut qu'une seule photo (la
+ * couverture) pour optimiser les performances.
+ *
+ * Le tri `isCover desc, sortOrder asc` — plutôt qu'un filtre `where isCover` —
+ * garantit qu'une vignette est toujours renvoyée, même si aucune photo n'est
+ * marquée comme couverture (cas d'un import ou d'une couverture supprimée).
  * @private
  */
 const listListingInclude = {
   ...publicListingInclude,
   photos: {
-    where: { isCover: true },
+    orderBy: [{ isCover: "desc" as const }, { sortOrder: "asc" as const }],
     take: 1,
   },
 };
 
+
+/**
+ * Déchiffre un `contactPhone` sans jamais faire échouer la requête appelante.
+ *
+ * Les annonces importées ou créées avant la mise en place du chiffrement
+ * peuvent contenir une valeur non déchiffrable ; on préfère renvoyer `null`
+ * plutôt que casser l'affichage du détail.
+ *
+ * @param ciphertext - Valeur stockée en base (`iv:tag:données`).
+ * @returns Le numéro en clair, ou `null` si le déchiffrement échoue.
+ * @private
+ */
+function safeDecrypt(ciphertext: string | null | undefined): string | null {
+  if (!ciphertext) return null;
+  try {
+    return decrypt(ciphertext);
+  } catch (err) {
+    logger.warn({ err }, "contactPhone decrypt failed");
+    return null;
+  }
+}
 
 /**
  * Supprime le champ `contactPhone` (chiffré) d'un objet listing
@@ -384,37 +409,72 @@ export async function listFeatured() {
 }
 
 /**
- * Récupère le détail d'une annonce active.
+ * Récupère le détail d'une annonce.
  *
- * Incrémente le compteur de vues (fire-and-forget).
- * Le `contactPhone` chiffré est remplacé par `contactPhoneDisplayed` (numéro WCC).
+ * Visibilité (§4.5, §4.11) :
+ *   - Annonce `ACTIVE` → accessible à tous, même anonyme.
+ *   - Tout autre statut (`PENDING`, `REJECTED`, `PAUSED`) → réservé au
+ *     propriétaire et aux ADMIN. C'est ce qui permet à l'admin d'examiner une
+ *     annonce **avant** de la valider, et à l'annonceur de relire/corriger la
+ *     sienne pendant qu'elle est en attente.
+ *   - Annonce supprimée (`deletedAt`) → 404 pour tout le monde.
+ *
+ * Le compteur de vues n'est incrémenté que pour une consultation « publique » :
+ * les relectures du propriétaire et les passages en modération ne gonflent pas
+ * les statistiques de l'annonce.
+ *
+ * Le `contactPhone` chiffré n'est jamais renvoyé tel quel. Le public reçoit
+ * `contactPhoneDisplayed` (numéro OKKAZ) ; le propriétaire et les ADMIN
+ * reçoivent en plus `contactPhoneOwner`, le numéro réel déchiffré, nécessaire
+ * pour vérifier (admin) ou préremplir le formulaire d'édition (annonceur).
  *
  * @param listingId - UUID de l'annonce.
+ * @param viewer    - Appelant identifié (`{ id, role }`), ou `undefined` si anonyme.
  * @returns L'annonce détaillée avec photos, catégorie et propriétaire.
- * @throws {AppError} 404 si l'annonce n'existe pas ou n'est pas active.
+ * @throws {AppError} 404 si l'annonce n'existe pas, est supprimée, ou n'est pas
+ *   visible par l'appelant.
  */
-export async function getDetail(listingId: string) {
+export async function getDetail(
+  listingId: string,
+  viewer?: { id: string; role: UserRole },
+) {
   const listing = await prisma.listing.findFirst({
-    where: { id: listingId, deletedAt: null, status: ListingStatus.ACTIVE },
+    where: { id: listingId, deletedAt: null },
     include: publicListingInclude,
   });
   if (!listing)
     throw AppError.notFound("LISTING_NOT_FOUND", "Annonce introuvable.");
 
-  // Incrémente le compteur de vues (non bloquant).
-  prisma.listing
-    .update({
-      where: { id: listingId },
-      data: { viewsCount: { increment: 1 } },
-    })
-    .catch((err) => logger.warn({ err, listingId }, "view increment failed"));
+  const isAdmin = viewer?.role === UserRole.ADMIN;
+  const isOwner = Boolean(viewer) && viewer!.id === listing.userId;
+  const isPrivileged = isAdmin || isOwner;
 
-  // Ne renvoie jamais contactPhone en clair ici. Affiche uniquement le WCC.
-  // Le numéro réel (si l'annonceur est abonné) n'est dévoilé que par
-  // `revealContact` (POST /:id/contact).
+  // Une annonce non publiée n'existe pas pour le public — même code 404 que
+  // pour un UUID inconnu, afin de ne rien divulguer sur les brouillons.
+  if (listing.status !== ListingStatus.ACTIVE && !isPrivileged) {
+    throw AppError.notFound("LISTING_NOT_FOUND", "Annonce introuvable.");
+  }
+
+  // Incrémente le compteur de vues (non bloquant) — consultations publiques
+  // uniquement (ni le propriétaire, ni la modération admin).
+  if (!isPrivileged) {
+    prisma.listing
+      .update({
+        where: { id: listingId },
+        data: { viewsCount: { increment: 1 } },
+      })
+      .catch((err) => logger.warn({ err, listingId }, "view increment failed"));
+  }
+
+  // Ne renvoie jamais contactPhone en clair au public : uniquement le WCC.
+  // Le numéro réel (si l'annonceur est abonné) n'est dévoilé à un locataire
+  // que par `revealContact` (POST /:id/contact).
   return {
     ...stripPrivateFields(listing),
     contactPhoneDisplayed: await currentWccPhone(listing.contactPhoneWcc),
+    ...(isPrivileged
+      ? { contactPhoneOwner: safeDecrypt(listing.contactPhone) }
+      : {}),
   };
 }
 
@@ -605,6 +665,22 @@ export async function deletePhoto(
     );
   }
   await prisma.listingPhoto.delete({ where: { id: photoId } });
+
+  // Supprimer la couverture laisserait l'annonce sans vignette : on promeut
+  // la photo restante la plus ancienne.
+  if (photo.isCover) {
+    const next = await prisma.listingPhoto.findFirst({
+      where: { listingId },
+      orderBy: { sortOrder: "asc" },
+      select: { id: true },
+    });
+    if (next) {
+      await prisma.listingPhoto.update({
+        where: { id: next.id },
+        data: { isCover: true },
+      });
+    }
+  }
 }
 
 // --- Pause / Resume ----------------------------------------------------------

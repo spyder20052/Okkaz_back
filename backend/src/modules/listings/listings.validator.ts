@@ -50,25 +50,49 @@ export const photoIdParamSchema = z.object({ id: z.string().uuid(), photo_id: z.
 /**
  * Schéma de validation des query params pour `GET /listings`.
  *
+ * Fourchette de prix : les deux bornes sont refusées si elles sont négatives
+ * ou non numériques, et `minPrice` ne peut pas dépasser `maxPrice` — sinon le
+ * filtre renverrait silencieusement une liste vide.
+ *
  * @property categoryId - Filtre par catégorie (UUID).
  * @property city       - Filtre par ville.
- * @property minPrice / maxPrice - Fourchette de prix.
+ * @property minPrice / maxPrice - Fourchette de prix (≥ 0, min ≤ max).
  * @property isLoa      - Filtre LOA.
  * @property sort       - Tri : `recent`, `price_asc`, `price_desc`, `featured`.
  * @property q          - Recherche textuelle (max 100).
  * @property page/limit - Pagination.
  */
-export const listListingsQuerySchema = z.object({
-  categoryId: z.string().uuid().optional(),
-  city: z.string().optional(),
-  minPrice: z.coerce.number().min(0).optional(),
-  maxPrice: z.coerce.number().min(0).optional(),
-  isLoa: z.coerce.boolean().optional(),
-  sort: z.enum(['recent', 'price_asc', 'price_desc', 'featured']).default('recent'),
-  q: z.string().max(100).optional(),
-  page: z.coerce.number().int().min(1).optional(),
-  limit: z.coerce.number().int().min(1).max(100).optional(),
-});
+export const listListingsQuerySchema = z
+  .object({
+    categoryId: z.string().uuid().optional(),
+    city: z.string().optional(),
+    minPrice: z.coerce
+      .number({ invalid_type_error: 'Le prix minimum doit être un nombre.' })
+      .min(0, 'Le prix minimum ne peut pas être négatif.')
+      .optional(),
+    maxPrice: z.coerce
+      .number({ invalid_type_error: 'Le prix maximum doit être un nombre.' })
+      .min(0, 'Le prix maximum ne peut pas être négatif.')
+      .optional(),
+    isLoa: z.coerce.boolean().optional(),
+    sort: z.enum(['recent', 'price_asc', 'price_desc', 'featured']).default('recent'),
+    q: z.string().max(100).optional(),
+    page: z.coerce.number().int().min(1).optional(),
+    limit: z.coerce.number().int().min(1).max(100).optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (
+      value.minPrice !== undefined &&
+      value.maxPrice !== undefined &&
+      value.minPrice > value.maxPrice
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['minPrice'],
+        message: 'Le prix minimum ne peut pas dépasser le prix maximum.',
+      });
+    }
+  });
 
 /**
  * Schéma pour l'upload de photos. `coverIndex` désigne la couverture.

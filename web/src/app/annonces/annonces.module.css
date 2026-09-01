@@ -263,6 +263,23 @@
   gap: 0.6rem;
 }
 
+/* Message de correction d'un filtre (prix négatif ramené à 0, borne inversée). */
+.filterNotice {
+  margin: 0.55rem 0 0;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid rgba(180, 83, 9, 0.28);
+  border-radius: 10px;
+  background: rgba(251, 191, 36, 0.14);
+  color: #92400e;
+  font-size: 0.72rem;
+  font-weight: 750;
+  line-height: 1.35;
+}
+
+.filterField input[aria-invalid="true"] {
+  color: #b91c1c;
+}
+
 .sortDropdown {
   margin-left: 0;
 }

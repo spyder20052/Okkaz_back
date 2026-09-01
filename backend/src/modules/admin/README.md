@@ -32,3 +32,17 @@ Les routes sont exposées avec le préfixe `/admin`, et le middleware d'autorisa
 | GET     | `/stats/users-growth`       | Évolution temporelle des inscriptions             |
 | GET     | `/stats/top-listings`       | Annonces les plus vues / sauvegardées             |
 | GET     | `/stats/top-categories`     | Catégories les plus actives (quantité/revenu)     |
+
+## File de modération des annonces (`GET /admin/listings`)
+
+La réponse inclut, pour chaque annonce, `owner`, `category` et **`photos`** (triées
+couverture d'abord). C'est indispensable : l'admin doit voir le bien tel que l'annonceur
+l'a soumis pour pouvoir statuer. Sans cette relation, l'interface retombait sur une image
+de remplacement et validait des annonces à l'aveugle.
+
+Le champ `contactPhone` (chiffré AES-256-GCM en base, donc inexploitable côté client) est
+retiré de la réponse. Pour vérifier le numéro réel du vendeur, l'admin ouvre le détail de
+l'annonce : `GET /listings/:id` lui renvoie `contactPhoneOwner` — la route accepte les
+annonces `PENDING` pour les ADMIN, précisément pour permettre cet examen avant validation.
+
+Rappel : consulter une annonce en modération n'incrémente pas son compteur de vues.

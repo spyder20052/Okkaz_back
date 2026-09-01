@@ -5,7 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useHeroUnfold } from "@/hooks/useHeroUnfold";
-import { api, mediaUrl } from "@/lib/api";
+import { api, ApiError, mediaUrl } from "@/lib/api";
 import {
   formatPrice,
   RENTAL_PERIOD_LABELS,
@@ -31,6 +31,31 @@ function coverUrl(listing: Listing): string {
   return mediaUrl(cover?.url);
 }
 
+/**
+ * Normalise une borne de prix saisie au clavier.
+ *
+ * `<input type="number" min="0">` n'empêche pas de *taper* une valeur négative
+ * (le `min` HTML ne s'applique qu'aux flèches et à la validation d'un form).
+ * On ramène donc toute valeur négative à 0 et on signale la correction, plutôt
+ * que d'envoyer un filtre que l'API refusera (422).
+ *
+ * @param raw - Contenu brut du champ.
+ * @returns `{ value, notice }` — valeur à stocker et message à afficher (ou `null`).
+ */
+function normalizePriceInput(raw: string): { value: string; notice: string | null } {
+  const trimmed = raw.trim();
+  if (trimmed === "") return { value: "", notice: null };
+
+  const parsed = Number(trimmed);
+  if (!Number.isFinite(parsed)) {
+    return { value: "", notice: "Le prix doit être un nombre." };
+  }
+  if (parsed < 0) {
+    return { value: "0", notice: "Un prix ne peut pas être négatif : la valeur a été ramenée à 0." };
+  }
+  return { value: trimmed, notice: null };
+}
+
 function AnnoncesContent() {
   const searchParams = useSearchParams();
   const unfoldProgress = useHeroUnfold();
@@ -49,8 +74,10 @@ function AnnoncesContent() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [listings, setListings] = useState<Listing[]>([]);
   const [meta, setMeta] = useState({ page: 1, limit: PAGE_SIZE, total: 0, totalPages: 1 });
-  const [isLoading, setIsLoading] = useState(true);
+  const [isFetching, setIsFetching] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Message de correction/refus d'un filtre (prix négatif, fourchette inversée…).
+  const [filterNotice, setFilterNotice] = useState<string | null>(null);
 
   const categorySlugParam = searchParams.get("category") ?? "";
 
@@ -82,12 +109,23 @@ function AnnoncesContent() {
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
-  // Chargement des annonces
+  // Fourchette de prix incohérente : on prévient sans bloquer la recherche
+  // (le backend applique la même règle et renverrait un 422).
+  const priceRangeInverted =
+    minPrice !== "" && maxPrice !== "" && Number(minPrice) > Number(maxPrice);
+
+  // Aucun appel n'est en vol tant que la fourchette est incohérente : le
+  // squelette de chargement ne doit donc pas rester affiché.
+  const isLoading = isFetching && !priceRangeInverted;
+
+  // Chargement des annonces. Une fourchette incohérente ne déclenche aucun
+  // appel : on garde la liste précédente et on affiche l'avertissement.
   useEffect(() => {
+    if (priceRangeInverted) return;
     let cancelled = false;
     queueMicrotask(() => {
       if (cancelled) return;
-      setIsLoading(true);
+      setIsFetching(true);
       setError(null);
     });
     api
@@ -111,17 +149,23 @@ function AnnoncesContent() {
         setListings(res.data);
         setMeta(res.meta);
       })
-      .catch(() => {
+      .catch((err) => {
         if (cancelled) return;
-        setError("Impossible de charger les annonces. Vérifiez que le serveur est démarré.");
+        // Un filtre refusé (422) doit afficher le motif exact renvoyé par l'API,
+        // et non un message générique de serveur indisponible.
+        setError(
+          err instanceof ApiError
+            ? err.message
+            : "Impossible de charger les annonces. Vérifiez que le serveur est démarré.",
+        );
       })
       .finally(() => {
-        if (!cancelled) setIsLoading(false);
+        if (!cancelled) setIsFetching(false);
       });
     return () => {
       cancelled = true;
     };
-  }, [debouncedSearch, categoryId, loaOnly, city, minPrice, maxPrice, sort, page]);
+  }, [debouncedSearch, categoryId, loaOnly, city, minPrice, maxPrice, sort, page, priceRangeInverted]);
 
   const heroCenter = (HERO_LETTERS.length - 1) / 2;
   const categoryChips = useMemo(
@@ -260,9 +304,17 @@ function AnnoncesContent() {
                     <input
                       type="number"
                       min="0"
+                      step="any"
+                      inputMode="decimal"
                       placeholder="0 FCFA"
+                      aria-invalid={priceRangeInverted || undefined}
                       value={minPrice}
-                      onChange={(event) => { setMinPrice(event.target.value); setPage(1); }}
+                      onChange={(event) => {
+                        const { value, notice } = normalizePriceInput(event.target.value);
+                        setMinPrice(value);
+                        setFilterNotice(notice);
+                        setPage(1);
+                      }}
                     />
                   </label>
                   <label className={styles.filterField}>
@@ -270,12 +322,29 @@ function AnnoncesContent() {
                     <input
                       type="number"
                       min="0"
+                      step="any"
+                      inputMode="decimal"
                       placeholder="Sans limite"
+                      aria-invalid={priceRangeInverted || undefined}
                       value={maxPrice}
-                      onChange={(event) => { setMaxPrice(event.target.value); setPage(1); }}
+                      onChange={(event) => {
+                        const { value, notice } = normalizePriceInput(event.target.value);
+                        setMaxPrice(value);
+                        setFilterNotice(notice);
+                        setPage(1);
+                      }}
                     />
                   </label>
                 </div>
+                {priceRangeInverted ? (
+                  <p className={styles.filterNotice} role="alert">
+                    Le prix minimum ne peut pas dépasser le prix maximum.
+                  </p>
+                ) : filterNotice ? (
+                  <p className={styles.filterNotice} role="status">
+                    {filterNotice}
+                  </p>
+                ) : null}
               </div>
             </details>
             <button

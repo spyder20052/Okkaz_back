@@ -68,12 +68,32 @@ export function mediaUrl(url: string | null | undefined): string {
   if (!url) return "/ads/car1.jpg";
   if (url.startsWith("http") || url.startsWith("data:")) return url;
   // Les assets du dossier public Next (/ads, /images, etc.) restent locaux.
-  // Seuls les fichiers uploadés par l'API doivent être préfixés par son origine.
-  if (url.startsWith("/uploads/")) return `${API_ORIGIN}${url}`;
+  // Seuls les fichiers uploadés par l'API doivent être préfixés par son origine :
+  //   - /uploads/... → driver `local` (dev, disque du backend) ;
+  //   - /files/...   → driver `db` (fichiers en base, servis par GET /files/:id).
+  // Sans ce préfixe, le navigateur les demanderait à l'origine du front et
+  // n'obtiendrait qu'un 404 (images d'annonces cassées partout).
+  if (url.startsWith("/uploads/") || url.startsWith("/files/")) {
+    return `${API_ORIGIN}${url}`;
+  }
   return url;
 }
 
 let refreshPromise: Promise<boolean> | null = null;
+
+/**
+ * Force une rotation des tokens depuis l'extérieur du client HTTP.
+ *
+ * Utile pour les routes à authentification *facultative* côté API : elles ne
+ * renvoient jamais 401 (elles répondent la vue publique), donc le rejeu
+ * automatique sur 401 d'`apiFetch` ne peut pas s'y déclencher. Un appelant qui
+ * attendait une réponse privilégiée peut ainsi rafraîchir puis réessayer.
+ *
+ * @returns `true` si un nouvel access token est disponible.
+ */
+export function refreshAccessToken(): Promise<boolean> {
+  return tryRefreshTokens();
+}
 
 async function tryRefreshTokens(): Promise<boolean> {
   const auth = readAuth();

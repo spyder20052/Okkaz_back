@@ -157,7 +157,12 @@ export async function getMyListings(userId: string, query: Record<string, unknow
       orderBy: { createdAt: 'desc' },
       skip,
       take: limit,
-      include: { photos: { take: 1, orderBy: { sortOrder: 'asc' } }, category: { select: { id: true, name: true, slug: true } } },
+      // Couverture d'abord (puis ordre d'upload) : la vignette du tableau de
+      // bord doit être la photo choisie par l'annonceur.
+      include: {
+        photos: { take: 1, orderBy: [{ isCover: 'desc' }, { sortOrder: 'asc' }] },
+        category: { select: { id: true, name: true, slug: true } },
+      },
     }),
     prisma.listing.count({ where: { userId, deletedAt: null } }),
   ]);

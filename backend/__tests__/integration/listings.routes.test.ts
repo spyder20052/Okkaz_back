@@ -154,6 +154,27 @@ describe('Listings Routes (Integration)', () => {
       expect(res.status).toBe(200);
       expect(res.body.data[0].categoryId).toBe(categoryId);
     });
+
+    it('doit refuser un prix minimum negatif (422)', async () => {
+      const res = await request(app).get('/api/v1/listings?minPrice=-1000');
+      expect(res.status).toBe(422);
+      expect(res.body.error.code).toBe('VALIDATION_ERROR');
+    });
+
+    it('doit refuser un prix maximum negatif (422)', async () => {
+      const res = await request(app).get('/api/v1/listings?maxPrice=-1');
+      expect(res.status).toBe(422);
+    });
+
+    it('doit refuser une fourchette de prix inversee (422)', async () => {
+      const res = await request(app).get('/api/v1/listings?minPrice=90000&maxPrice=1000');
+      expect(res.status).toBe(422);
+    });
+
+    it('doit accepter une fourchette de prix valide', async () => {
+      const res = await request(app).get('/api/v1/listings?minPrice=0&maxPrice=100000');
+      expect(res.status).toBe(200);
+    });
   });
 
   describe('GET /api/v1/listings/:id', () => {
@@ -166,6 +187,80 @@ describe('Listings Routes (Integration)', () => {
     it('doit retourner 404 pour une annonce inexistante', async () => {
       const res = await request(app).get('/api/v1/listings/00000000-0000-0000-0000-000000000000');
       expect(res.status).toBe(404);
+    });
+
+    // Cas de test terrain n°8 : une annonce en attente doit rester relisible
+    // par son auteur et par l'admin, mais invisible du public.
+    describe('annonce en attente de validation', () => {
+      let pendingId: string;
+
+      beforeAll(async () => {
+        const res = await request(app)
+          .post('/api/v1/listings')
+          .set('Authorization', `Bearer ${sellerToken}`)
+          .send({
+            title: 'Groupe electrogene en attente',
+            description: 'Annonce laissee en attente de validation admin.',
+            categoryId,
+            rentalPrice: 25000,
+            rentalPeriod: 'DAY',
+            condition: 'GOOD',
+            locationCity: 'Cotonou',
+            contactPhone: '229977001122',
+          });
+        pendingId = res.body.data.listing.id;
+        expect(res.body.data.listing.status).toBe('PENDING');
+      });
+
+      it('doit renvoyer 404 a un visiteur anonyme', async () => {
+        const res = await request(app).get(`/api/v1/listings/${pendingId}`);
+        expect(res.status).toBe(404);
+      });
+
+      it('doit renvoyer le detail a son proprietaire, avec son vrai numero', async () => {
+        const res = await request(app)
+          .get(`/api/v1/listings/${pendingId}`)
+          .set('Authorization', `Bearer ${sellerToken}`);
+        expect(res.status).toBe(200);
+        expect(res.body.data.listing.status).toBe('PENDING');
+        expect(res.body.data.listing.contactPhoneOwner).toBe('229977001122');
+        expect(res.body.data.listing.contactPhone).toBeUndefined();
+      });
+
+      it('doit renvoyer le detail a un ADMIN avant validation', async () => {
+        const res = await request(app)
+          .get(`/api/v1/listings/${pendingId}`)
+          .set('Authorization', `Bearer ${adminToken}`);
+        expect(res.status).toBe(200);
+        expect(res.body.data.listing.status).toBe('PENDING');
+        expect(res.body.data.listing.contactPhoneOwner).toBe('229977001122');
+      });
+
+      it('ne doit pas compter de vue pour une relecture proprietaire ou admin', async () => {
+        const before = await prisma.listing.findUnique({ where: { id: pendingId } });
+        await request(app)
+          .get(`/api/v1/listings/${pendingId}`)
+          .set('Authorization', `Bearer ${adminToken}`);
+        const after = await prisma.listing.findUnique({ where: { id: pendingId } });
+        expect(after!.viewsCount).toBe(before!.viewsCount);
+      });
+
+      it('doit rester modifiable par son proprietaire pendant l attente', async () => {
+        const res = await request(app)
+          .patch(`/api/v1/listings/${pendingId}`)
+          .set('Authorization', `Bearer ${sellerToken}`)
+          .send({ title: 'Groupe electrogene corrige avant validation' });
+        expect(res.status).toBe(200);
+        expect(res.body.data.listing.title).toBe('Groupe electrogene corrige avant validation');
+        expect(res.body.data.listing.status).toBe('PENDING');
+      });
+
+      it('doit ignorer un token invalide et rester 404 pour le public', async () => {
+        const res = await request(app)
+          .get(`/api/v1/listings/${pendingId}`)
+          .set('Authorization', 'Bearer not-a-real-token');
+        expect(res.status).toBe(404);
+      });
     });
   });
 

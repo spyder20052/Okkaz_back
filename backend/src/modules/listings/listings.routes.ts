@@ -6,6 +6,7 @@ import { Router } from 'express';
 import * as controller from './listings.controller';
 import * as schemas from './listings.validator';
 import { authenticate } from '../../middlewares/authenticate';
+import { optionalAuthenticate } from '../../middlewares/optionalAuthenticate';
 import { authorize } from '../../middlewares/authorize';
 import { validateRequest } from '../../middlewares/validateRequest';
 import { upload } from '../../middlewares/upload';
@@ -15,7 +16,15 @@ const router = Router();
 
 router.get('/', validateRequest({ query: schemas.listListingsQuerySchema }), asyncHandler(controller.list));
 router.get('/featured', asyncHandler(controller.featured));
-router.get('/:id', validateRequest({ params: schemas.listingIdParamSchema }), asyncHandler(controller.detail));
+// Authentification facultative : le détail reste public pour une annonce
+// ACTIVE, mais le propriétaire et les ADMIN peuvent aussi consulter une
+// annonce encore PENDING (relecture avant validation).
+router.get(
+  '/:id',
+  optionalAuthenticate,
+  validateRequest({ params: schemas.listingIdParamSchema }),
+  asyncHandler(controller.detail),
+);
 
 // Consultation ouverte à tout compte consommateur : un vendeur peut aussi louer
 // (cahier des charges : « création de compte obligatoire pour toute action »).

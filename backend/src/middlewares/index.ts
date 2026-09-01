@@ -1,4 +1,5 @@
 export { authenticate } from './authenticate';
+export { optionalAuthenticate } from './optionalAuthenticate';
 export { authorize } from './authorize';
 export { validateRequest } from './validateRequest';
 export { errorHandler } from './errorHandler';

@@ -67,6 +67,12 @@ export interface Listing {
   locationCity: string;
   locationAddress?: string | null;
   contactPhoneDisplayed?: string;
+  /**
+   * Numéro réel de l'annonceur, déchiffré. Renvoyé par `GET /listings/:id`
+   * uniquement au propriétaire de l'annonce et aux ADMIN — absent partout
+   * ailleurs. `null` si la valeur en base n'a pas pu être déchiffrée.
+   */
+  contactPhoneOwner?: string | null;
   status: ListingStatus;
   isFeatured: boolean;
   isUrgent: boolean;

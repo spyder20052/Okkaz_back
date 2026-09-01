@@ -72,6 +72,15 @@ describe('Admin Routes Integration Tests', () => {
       },
     });
     targetListingId = listing.id;
+
+    // 4. Photos de l'annonce — la file de modération doit renvoyer les vraies
+    //    images du bien, pas une vignette de remplacement.
+    await prisma.listingPhoto.createMany({
+      data: [
+        { listingId: listing.id, url: '/uploads/listings/secondaire.jpg', sortOrder: 1, isCover: false },
+        { listingId: listing.id, url: '/uploads/listings/couverture.jpg', sortOrder: 0, isCover: true },
+      ],
+    });
   });
 
   afterAll(async () => {
@@ -129,6 +138,23 @@ describe('Admin Routes Integration Tests', () => {
   });
 
   describe('Listings Operations', () => {
+    it('GET /api/v1/admin/listings doit renvoyer les photos réelles des annonces', async () => {
+      const res = await request(app)
+        .get('/api/v1/admin/listings')
+        .query({ status: ListingStatus.PENDING })
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(res.status).toBe(200);
+      const target = res.body.data.find((l: { id: string }) => l.id === targetListingId);
+      expect(target).toBeDefined();
+      expect(target.photos).toHaveLength(2);
+      // Couverture en premier : c'est la vignette affichée dans la file.
+      expect(target.photos[0].isCover).toBe(true);
+      expect(target.photos[0].url).toBe('/uploads/listings/couverture.jpg');
+      // Le contact chiffré ne doit pas fuiter dans la liste admin.
+      expect(target.contactPhone).toBeUndefined();
+    });
+
     it('PATCH /api/v1/admin/listings/:id/validate doit renvoyer 404 si introuvable', async () => {
       const res = await request(app)
         .patch('/api/v1/admin/listings/11111111-1111-1111-1111-111111111111/validate')

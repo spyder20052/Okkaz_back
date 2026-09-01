@@ -121,9 +121,11 @@ function PublishForm() {
         setLoaDuration(l.loaDurationMonths ? String(l.loaDurationMonths) : "");
         setCity(l.locationCity);
         setAddressDetail(l.locationAddress ?? "");
-        // Écart backend : l'API ne renvoie jamais le vrai contactPhone (contactPhoneDisplayed
-        // est masqué en +22900000000 sans Premium, même pour le propriétaire) → on préremplit
-        // avec le téléphone du compte plutôt qu'avec la valeur masquée.
+        // `contactPhoneOwner` = numéro réel déchiffré, renvoyé au propriétaire
+        // (et aux ADMIN) uniquement. `contactPhoneDisplayed` est le numéro OKKAZ
+        // affiché au public : il ne doit jamais préremplir ce champ, sinon une
+        // simple modification écraserait le contact du vendeur.
+        if (l.contactPhoneOwner) setContactPhoneInput(l.contactPhoneOwner);
         setExistingPhotos((l.photos ?? []).map((p) => ({ id: p.id, url: p.url })));
       })
       .catch(() => {

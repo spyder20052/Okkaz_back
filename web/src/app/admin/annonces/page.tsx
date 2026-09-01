@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { api, ApiError, mediaUrl } from "@/lib/api";
 import {
@@ -10,6 +9,7 @@ import {
   RENTAL_PERIOD_LABELS,
   type DashboardStats,
   type Listing,
+  type ListingPhoto,
   type ListingStatus,
 } from "@/lib/types";
 import AdminShell from "../AdminShell";
@@ -19,6 +19,17 @@ type Meta = { page: number; limit: number; total: number; totalPages: number };
 
 const STATUS_FILTERS: ListingStatus[] = ["PENDING", "ACTIVE", "REJECTED", "PAUSED"];
 const PAGE_SIZE = 10;
+
+/**
+ * Photos d'une annonce, couverture en premier — l'API renvoie déjà cet ordre,
+ * on le re-applique côté client pour ne pas dépendre de l'ordre de sérialisation.
+ */
+function orderedPhotos(listing: Listing): ListingPhoto[] {
+  return [...(listing.photos ?? [])].sort((a, b) => {
+    if (a.isCover !== b.isCover) return a.isCover ? -1 : 1;
+    return a.sortOrder - b.sortOrder;
+  });
+}
 
 function submittedAgo(iso: string): string {
   const diffMs = Date.now() - new Date(iso).getTime();
@@ -38,6 +49,8 @@ export default function AdminAnnoncesPage() {
   const [loading, setLoading] = useState(true);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [actingId, setActingId] = useState<string | null>(null);
+  // Visionneuse de modération : { annonce, index de la photo affichée }.
+  const [preview, setPreview] = useState<{ listing: Listing; index: number } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -60,6 +73,16 @@ export default function AdminAnnoncesPage() {
     const timer = setTimeout(() => void load(), 0);
     return () => clearTimeout(timer);
   }, [load]);
+
+  // Échap ferme la visionneuse.
+  useEffect(() => {
+    if (!preview) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setPreview(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [preview]);
 
   useEffect(() => {
     api
@@ -204,14 +227,36 @@ export default function AdminAnnoncesPage() {
             <ul className={styles.adminAdsList}>
               {visibleAds.map((ad) => (
                 <li key={ad.id} className={styles.adminAdItem}>
-                  <Image
-                    src={mediaUrl(ad.photos?.[0]?.url)}
-                    alt={ad.title}
-                    width={84}
-                    height={84}
-                    className={styles.adminAdItemImg}
-                    unoptimized
-                  />
+                  {(() => {
+                    const photos = orderedPhotos(ad);
+                    if (photos.length === 0) {
+                      return (
+                        <div className={styles.adminAdThumb}>
+                          <span className={styles.adminAdThumbEmpty}>Sans photo</span>
+                        </div>
+                      );
+                    }
+                    return (
+                      <button
+                        type="button"
+                        className={styles.adminAdThumb}
+                        onClick={() => setPreview({ listing: ad, index: 0 })}
+                        aria-label={`Agrandir les ${photos.length} photo${photos.length > 1 ? "s" : ""} de ${ad.title}`}
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={mediaUrl(photos[0].url)}
+                          alt={ad.title}
+                          width={84}
+                          height={84}
+                          className={styles.adminAdItemImg}
+                        />
+                        {photos.length > 1 ? (
+                          <span className={styles.adminAdThumbCount}>+{photos.length - 1}</span>
+                        ) : null}
+                      </button>
+                    );
+                  })()}
                   <div className={styles.adminAdMain}>
                     <div className={styles.adminAdTitleRow}>
                       <strong>{ad.title}</strong>
@@ -235,6 +280,12 @@ export default function AdminAnnoncesPage() {
                       <span>
                         <small>Mode</small>
                         {ad.purchasePrice ? "Location / Achat" : "Location"}
+                      </span>
+                      <span>
+                        <small>Photos</small>
+                        {orderedPhotos(ad).length === 0
+                          ? "Aucune"
+                          : `${orderedPhotos(ad).length} fournie${orderedPhotos(ad).length > 1 ? "s" : ""}`}
                       </span>
                     </div>
                   </div>
@@ -290,6 +341,51 @@ export default function AdminAnnoncesPage() {
             </div>
           ) : null}
         </section>
+
+        {preview
+          ? (() => {
+              const photos = orderedPhotos(preview.listing);
+              const index = Math.min(preview.index, photos.length - 1);
+              return (
+                <div
+                  className={styles.adminLightbox}
+                  role="dialog"
+                  aria-modal="true"
+                  aria-label={`Photos de ${preview.listing.title}`}
+                >
+                  <div className={styles.adminLightboxBar}>
+                    <strong>{preview.listing.title}</strong>
+                    <button
+                      type="button"
+                      className={styles.adminLightboxClose}
+                      onClick={() => setPreview(null)}
+                      autoFocus
+                    >
+                      Fermer
+                    </button>
+                  </div>
+                  <div className={styles.adminLightboxStage}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={mediaUrl(photos[index]?.url)} alt={`${preview.listing.title} — photo ${index + 1}`} />
+                  </div>
+                  <div className={styles.adminLightboxThumbs}>
+                    {photos.map((photo, i) => (
+                      <button
+                        key={photo.id}
+                        type="button"
+                        className={i === index ? styles.adminLightboxThumbActive : undefined}
+                        onClick={() => setPreview({ listing: preview.listing, index: i })}
+                        aria-label={`Photo ${i + 1} sur ${photos.length}`}
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={mediaUrl(photo.url)} alt="" />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()
+          : null}
       </section>
     </AdminShell>
   );

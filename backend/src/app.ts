@@ -130,7 +130,22 @@ export function createApp(): Application {
   // charge des dizaines d'images.
   app.use(env.API_PREFIX, globalLimiter);
 
+  // ── Photos d'annonces : chargeables depuis le front ──────────────────────
+  // helmet pose `Cross-Origin-Resource-Policy: same-origin` sur toute réponse.
+  // Le front (Vercel) et l'API vivent sur deux origines distinctes : le
+  // navigateur refuse alors d'afficher les <img> servies par l'API — la balise
+  // reçoit bien un 200 mais rend une image cassée (ERR_BLOCKED_BY_RESPONSE).
+  // On relâche l'en-tête pour les seules images publiques ; les pièces KYC
+  // (`/uploads/kyc/...`, `/files/:id` privés) restent en `same-origin`.
+  const allowCrossOriginEmbedding = (res: Response): void => {
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+  };
+
   // ── Uploads locaux (dev) ─────────────────────────────────────────────────
+  app.use('/uploads', (req: Request, res: Response, next: NextFunction) => {
+    if (!req.path.startsWith('/kyc/')) allowCrossOriginEmbedding(res);
+    next();
+  });
   app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));
 
   // ── Fichiers stockés en base (driver `db` — Neon en production) ──────────
@@ -182,6 +197,8 @@ export function createApp(): Application {
       } else {
         // Contenu immuable : l'id est unique par upload.
         res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+        // Photo d'annonce : doit pouvoir s'afficher dans le front (autre origine).
+        allowCrossOriginEmbedding(res);
       }
       res.setHeader('Content-Type', file.mime);
       return res.send(Buffer.from(file.data));
@@ -210,6 +227,21 @@ export function createApp(): Application {
         },
       ],
     };
+
+    // — Specs brutes (Postman / Insomnia)
+    // Déclarées avant l'UI : `app.use(docsPath, swaggerUi.serve)` capturerait
+    // sinon /docs/spec.json et renverrait le HTML de l'interface.
+    // — Spec brute JSON  (Postman / Insomnia)
+    app.get(`${docsPath}/spec.json`, (_req, res) => {
+      res.setHeader('Content-Type', 'application/json');
+      res.json(swaggerSpec);
+    });
+
+    // — Spec brute YAML
+    app.get(`${docsPath}/spec.yaml`, (_req, res) => {
+      res.setHeader('Content-Type', 'text/yaml; charset=utf-8');
+      res.send(fs.readFileSync(SPEC_PATH, 'utf-8'));
+    });
 
     // — Interface Swagger UI complète
     app.use(
@@ -251,18 +283,6 @@ export function createApp(): Application {
         },
       }),
     );
-
-    // — Spec brute JSON  (Postman / Insomnia)
-    app.get(`${docsPath}/spec.json`, (_req, res) => {
-      res.setHeader('Content-Type', 'application/json');
-      res.json(swaggerSpec);
-    });
-
-    // — Spec brute YAML
-    app.get(`${docsPath}/spec.yaml`, (_req, res) => {
-      res.setHeader('Content-Type', 'text/yaml; charset=utf-8');
-      res.send(fs.readFileSync(SPEC_PATH, 'utf-8'));
-    });
 
     logger.info(`📚 Swagger UI  → http://localhost:${env.PORT}${docsPath}`);
     logger.info(`📄 Spec JSON   → http://localhost:${env.PORT}${docsPath}/spec.json`);

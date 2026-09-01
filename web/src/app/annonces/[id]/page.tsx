@@ -5,11 +5,12 @@ import type { FormEvent, MouseEvent } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
-import { api, ApiError, mediaUrl } from "@/lib/api";
+import { api, ApiError, mediaUrl, readAuth, refreshAccessToken } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import {
   CONDITION_LABELS,
   formatPrice,
+  LISTING_STATUS_LABELS,
   RENTAL_PERIOD_LABELS,
   type Listing,
   type ReportReason,
@@ -106,7 +107,11 @@ function AdDetailContent() {
   // Annonces similaires
   const [related, setRelated] = useState<Listing[]>([]);
 
-  // Chargement de l'annonce
+  // Chargement de l'annonce.
+  //
+  // La requête est authentifiée (token joint s'il existe) : `GET /listings/:id`
+  // sert la vue publique aux visiteurs, mais laisse le propriétaire et les
+  // ADMIN consulter une annonce encore en attente de validation.
   useEffect(() => {
     if (!id) return;
     let cancelled = false;
@@ -116,8 +121,20 @@ function AdDetailContent() {
       setNotFound(false);
       setLoadError(null);
     });
-    api
-      .get<{ listing: Listing }>(`/listings/${id}`, undefined, false)
+
+    const fetchListing = () => api.get<{ listing: Listing }>(`/listings/${id}`);
+
+    fetchListing()
+      .catch(async (err) => {
+        // La route n'exige pas d'authentification : un access token expiré est
+        // ignoré côté API, qui répond 404 sur une annonce non publiée au lieu
+        // d'un 401 déclenchant le rejeu automatique. On force donc une rotation
+        // puis on réessaie une fois avant de conclure à une annonce inexistante.
+        const isMissing = err instanceof ApiError && err.status === 404;
+        if (!isMissing || !readAuth()) throw err;
+        if (!(await refreshAccessToken())) throw err;
+        return fetchListing();
+      })
       .then((res) => {
         if (cancelled) return;
         setListing(res.data.listing);
@@ -204,6 +221,17 @@ function AdDetailContent() {
 
   const handleRevealContact = useCallback(async () => {
     if (!listing) return;
+    // `POST /:id/contact` n'existe que pour une annonce publiée : sur une
+    // relecture avant validation, le numéro réel est déjà dans le détail
+    // (`contactPhoneOwner`, réservé au propriétaire et aux ADMIN).
+    if (listing.status !== "ACTIVE") {
+      if (listing.contactPhoneOwner) {
+        setContact({ contactPhone: listing.contactPhoneOwner, isOwnerNumber: true });
+      } else {
+        setContactError("La mise en relation sera active dès la publication de l'annonce.");
+      }
+      return;
+    }
     setIsRevealing(true);
     setContactError(null);
     try {
@@ -303,6 +331,10 @@ function AdDetailContent() {
 
   const gallery = galleryPhotos(listing);
   const activeSrc = gallery[Math.min(activeImg, gallery.length - 1)];
+  // L'API ne sert une annonce non ACTIVE qu'à son propriétaire ou à un ADMIN :
+  // si on la voit ici, c'est une relecture avant publication.
+  const isOwnListing = user?.id === listing.userId;
+  const isAdminViewer = user?.role === "ADMIN";
   const ownerName = listing.owner
     ? `${listing.owner.firstName} ${listing.owner.lastName}`
     : "Vendeur OKKAZ";
@@ -317,6 +349,32 @@ function AdDetailContent() {
         <span aria-hidden>←</span>
         {backLabel}
       </Link>
+
+      {listing.status !== "ACTIVE" ? (
+        <div className={styles.moderationBanner} role="status">
+          <strong>{LISTING_STATUS_LABELS[listing.status]}</strong>
+          <p>
+            {listing.status === "PENDING"
+              ? isAdminViewer
+                ? "Cette annonce attend votre validation. Elle n'est pas encore visible du public : vérifiez les photos et les informations, puis validez ou refusez depuis la file de modération."
+                : "Votre annonce est en cours de vérification et n'est pas encore visible du public. Vous pouvez la relire et la corriger en attendant."
+              : listing.status === "REJECTED"
+                ? `Cette annonce a été refusée${listing.rejectionReason ? ` — motif : ${listing.rejectionReason}` : ""}. Corrigez-la puis renvoyez-la à la validation.`
+                : listing.status === "PAUSED"
+                  ? "Cette annonce est en pause : elle n'apparaît pas dans les résultats de recherche."
+                  : "Cette annonce n'est pas publiée."}
+          </p>
+          {isOwnListing ? (
+            <Link href={`/vendeur/publier?modifier=${listing.id}`} className={styles.moderationBannerCta}>
+              Modifier l&apos;annonce
+            </Link>
+          ) : isAdminViewer ? (
+            <Link href="/admin/annonces" className={styles.moderationBannerCta}>
+              File de modération
+            </Link>
+          ) : null}
+        </div>
+      ) : null}
 
       {/* Breadcrumb */}
       <nav className={styles.breadcrumb}>

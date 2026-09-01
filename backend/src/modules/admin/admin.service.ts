@@ -10,6 +10,18 @@ import { AppError } from '../../utils/AppError';
 import { parsePagination, buildPaginationMeta } from '../../utils/pagination';
 import { invalidateSettingsCache } from '../../services/settings.service';
 
+/**
+ * Tri des photos d'annonce : couverture d'abord, puis ordre d'upload.
+ *
+ * Un simple filtre `where: { isCover: true }` renverrait un tableau vide pour
+ * les annonces dont aucune photo n'est marquée comme couverture — la file de
+ * modération afficherait alors une image de remplacement au lieu du bien réel.
+ * @private
+ */
+const listingPhotosInclude = {
+  orderBy: [{ isCover: 'desc' as const }, { sortOrder: 'asc' as const }],
+} satisfies Prisma.Listing$photosArgs;
+
 // --- Users ------------------------------------------------------------------
 
 /**
@@ -91,7 +103,7 @@ export async function getUser(id: string) {
     where: { id },
     include: {
       kycDocuments: { orderBy: { createdAt: 'desc' }, take: 5 },
-      listings: { take: 10, orderBy: { createdAt: 'desc' } },
+      listings: { take: 10, orderBy: { createdAt: 'desc' }, include: { photos: listingPhotosInclude } },
       payments: { take: 10, orderBy: { createdAt: 'desc' } },
       subscriptions: { take: 5, orderBy: { createdAt: 'desc' } },
     },
@@ -147,8 +159,11 @@ async function assertUserExists(id: string): Promise<void> {
 /**
  * Liste toutes les annonces (admin) avec filtres.
  *
+ * Les photos réelles sont incluses (couverture en premier) : l'admin doit voir
+ * le bien tel que l'annonceur l'a soumis pour pouvoir statuer avant validation.
+ *
  * @param query - `{ status?, userId?, categoryId?, page?, limit? }`.
- * @returns `{ items, meta }` — annonces paginées.
+ * @returns `{ items, meta }` — annonces paginées, photos incluses.
  */
 export async function listAllListings(query: Record<string, unknown>) {
   const { page, limit, skip } = parsePagination(query);
@@ -166,11 +181,16 @@ export async function listAllListings(query: Record<string, unknown>) {
       include: {
         owner: { select: { id: true, email: true, firstName: true, lastName: true, role: true } },
         category: { select: { id: true, name: true } },
+        photos: listingPhotosInclude,
       },
     }),
     prisma.listing.count({ where }),
   ]);
-  return { items, meta: buildPaginationMeta(page, limit, total) };
+  // `contactPhone` est chiffré en base et inutile ici : on ne l'expose pas.
+  return {
+    items: items.map(({ contactPhone: _c, ...listing }) => listing),
+    meta: buildPaginationMeta(page, limit, total),
+  };
 }
 
 /**

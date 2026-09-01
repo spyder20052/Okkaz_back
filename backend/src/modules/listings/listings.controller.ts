@@ -30,13 +30,17 @@ export async function featured(_req: Request, res: Response): Promise<Response> 
 }
 
 /**
- * `GET /listings/:id` — Détail d'une annonce active.
+ * `GET /listings/:id` — Détail d'une annonce.
  *
- * @param req - Param `:id` (UUID).
+ * Route publique à authentification facultative (`optionalAuthenticate`) :
+ * une annonce `ACTIVE` est visible par tous, une annonce en attente de
+ * validation ne l'est que par son propriétaire ou un ADMIN.
+ *
+ * @param req - Param `:id` (UUID). `req.user` présent si un token valide est fourni.
  * @param res - 200 OK avec `{ listing }`.
  */
 export async function detail(req: Request, res: Response): Promise<Response> {
-  const listing = await service.getDetail(req.params.id!);
+  const listing = await service.getDetail(req.params.id!, req.user);
   return sendSuccess(res, { listing });
 }
 
