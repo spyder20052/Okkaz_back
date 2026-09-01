@@ -98,3 +98,35 @@
 **Contexte :** Les tarifs (2500 FCFA, 3000 FCFA…) et les règles métier (nb pics photos, durée accès) doivent être modifiables sans redéploiement.
 
 **Décision :** Table `system_settings` (clé/valeur). Lecture via `settings.service.ts` avec cache TTL 60s. Modification par l'admin via `PATCH /admin/settings`.
+
+---
+
+## ADR-009 · Cross-Origin-Resource-Policy des fichiers servis par l'API
+
+**Date :** 01/09/2026  
+**Statut :** Accepté
+
+**Contexte :** helmet applique `Cross-Origin-Resource-Policy: same-origin` à toutes les
+réponses. Le front (Vercel) et l'API vivent sur deux domaines distincts : le navigateur
+refusait donc d'afficher toute `<img>` pointant vers l'API — la requête recevait un HTTP 200
+mais était rejetée à l'affichage (`ERR_BLOCKED_BY_RESPONSE.NotSameOrigin`). Symptôme observé :
+la file de modération admin n'affichait jamais les vraies photos des annonces. Le contournement
+« tout passer en `cross-origin` » exposerait aussi les pièces d'identité KYC à l'embarquement
+depuis n'importe quel site.
+
+**Décision :** L'en-tête est relâché en `cross-origin` **par ressource, jamais globalement** :
+
+| Ressource | Politique | Raison |
+|---|---|---|
+| `/uploads/**` hors `kyc/` | `cross-origin` | Photos d'annonces, publiques par nature |
+| `/files/:id` avec `isPrivate = false` | `cross-origin` | Idem, stockage en base |
+| `/uploads/kyc/**` | `same-origin` (défaut) | Pièces d'identité |
+| `/files/:id` avec `isPrivate = true` | `same-origin` (défaut) | Pièces d'identité, déjà protégées par token |
+| Tout le reste de l'API | `same-origin` (défaut) | Aucune raison d'être embarqué |
+
+Les pièces KYC restent consultables par l'admin : le front les récupère en `fetch()` avec
+l'en-tête `Authorization` puis ouvre un blob — un mode CORS, non concerné par CORP.
+
+**Conséquence :** aucune dépendance à un driver de stockage particulier. Le comportement est
+identique avec `local`, `db` (Neon) et `cloudinary` — ce dernier servant déjà ses propres URLs
+absolues.

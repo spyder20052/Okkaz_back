@@ -371,12 +371,20 @@ paths:
             type: string
         - in: query
           name: minPrice
+          description: >
+            Borne basse du loyer. Doit être un nombre >= 0 et <= maxPrice,
+            sinon 422 VALIDATION_ERROR.
           schema:
             type: number
+            minimum: 0
         - in: query
           name: maxPrice
+          description: >
+            Borne haute du loyer. Doit être un nombre >= 0,
+            sinon 422 VALIDATION_ERROR.
           schema:
             type: number
+            minimum: 0
         - in: query
           name: sort
           schema:
@@ -397,6 +405,10 @@ paths:
       responses:
         "200":
           description: Liste paginée d'annonces
+        "422":
+          description: >
+            Filtre invalide — borne de prix négative, non numérique,
+            ou fourchette inversée (minPrice > maxPrice).
     post:
       tags: [Listings]
       summary: Créer une annonce (SELLER/SELLER_PRO)
@@ -410,6 +422,28 @@ paths:
     get:
       tags: [Listings]
       summary: Détail d'une annonce (contact affiché = WCC)
+      description: >
+        Authentification **facultative** : le token est lu s'il est fourni, mais
+        n'est jamais exigé (aucun 401).
+
+
+        Visibilité selon le statut :
+
+        * `ACTIVE` — accessible à tous, y compris anonyme. Incrémente `views_count`.
+
+        * `PENDING` / `REJECTED` / `PAUSED` — réservé au propriétaire de l'annonce
+          et aux ADMIN (relecture avant validation). Le compteur de vues n'est pas
+          incrémenté. La réponse porte en plus `contactPhoneOwner`, numéro réel du
+          vendeur déchiffré.
+
+        * supprimée (`deleted_at`) — 404 pour tout le monde.
+
+
+        Un appelant non autorisé reçoit le même 404 qu'un identifiant inconnu :
+        aucune information n'est divulguée sur les annonces non publiées.
+      security:
+        - bearerAuth: []
+        - {}
       parameters:
         - in: path
           name: id
@@ -418,7 +452,12 @@ paths:
             type: string
       responses:
         "200":
-          description: Détail annonce
+          description: >
+            Détail annonce. `contactPhoneDisplayed` = numéro OKKAZ (toujours présent).
+            `contactPhoneOwner` = numéro réel du vendeur, présent uniquement pour le
+            propriétaire et les ADMIN.
+        "404":
+          description: Annonce inexistante, supprimée, ou non visible par l'appelant.
     patch:
       tags: [Listings]
       summary: Mettre à jour une annonce
@@ -552,25 +591,65 @@ paths:
         "404":
           description: Annonce introuvable.
 
-  /admin/listings/pending:
+  /admin/listings:
     get:
       tags: [Admin]
-      summary: Liste des annonces en attente de validation
+      summary: Liste des annonces, tous statuts (filtrée, paginée)
+      description: >
+        File de modération. Les photos réelles de chaque annonce sont incluses,
+        couverture en premier — l'admin doit voir le bien tel que l'annonceur l'a
+        soumis avant de statuer. Le champ `contactPhone` (chiffré en base) n'est
+        pas exposé ; le numéro réel s'obtient sur le détail de l'annonce
+        (`GET /listings/{id}`, champ `contactPhoneOwner`).
       security:
         - bearerAuth: []
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [PENDING, ACTIVE, REJECTED, PAUSED, DELETED]
+        - in: query
+          name: userId
+          schema:
+            type: string
+        - in: query
+          name: categoryId
+          schema:
+            type: string
+        - in: query
+          name: page
+          schema:
+            type: integer
+        - in: query
+          name: limit
+          schema:
+            type: integer
       responses:
         "200":
-          description: Annonces PENDING paginées
+          description: >
+            Annonces paginées, chacune avec `owner`, `category` et `photos`
+            (triées `isCover` puis `sortOrder`).
+        "403":
+          description: Rôle ADMIN requis.
 
-  /admin/listings/{id}/approve:
+  /admin/listings/{id}/validate:
     patch:
       tags: [Admin]
-      summary: Approuver une annonce
+      summary: Valider une annonce
       security:
         - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
       responses:
         "200":
-          description: Annonce approuvée (statut ACTIVE)
+          description: Annonce validée (statut ACTIVE, `validatedBy`/`validatedAt` renseignés)
+        "404":
+          description: Annonce introuvable.
 
   /admin/listings/{id}/reject:
     patch:
@@ -578,9 +657,46 @@ paths:
       summary: Rejeter une annonce
       security:
         - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [rejectionReason]
+              properties:
+                rejectionReason:
+                  type: string
+                  minLength: 3
       responses:
         "200":
-          description: Annonce rejetée
+          description: Annonce rejetée (statut REJECTED, motif enregistré)
+        "404":
+          description: Annonce introuvable.
+
+  /admin/listings/{id}:
+    delete:
+      tags: [Admin]
+      summary: Supprimer définitivement une annonce
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Annonce supprimée
+        "404":
+          description: Annonce introuvable.
 
   /admin/dashboard:
     get:
